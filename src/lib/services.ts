@@ -549,3 +549,86 @@ export async function fetchScheduleSummaryService(
   return summaryMap;
 }
 
+export async function createCustomerService(data: {
+  name: string;
+  phone: string;
+  phone2?: string;
+  address?: string;
+  address_detail?: string;
+  memo?: string;
+}) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+
+  const now = new Date().toISOString();
+  const cleanPhone = data.phone.replace(/[^0-9]/g, "");
+
+  // 중복 확인 (전화번호 기준)
+  const existing = await db.execute({
+    sql: "SELECT id FROM customers WHERE REPLACE(phone, '-', '') = ? LIMIT 1",
+    args: [cleanPhone],
+  });
+
+  if (existing.rows.length > 0) {
+    const id = Number(existing.rows[0].id);
+    await db.execute({
+      sql: `UPDATE customers SET 
+              name = ?, 
+              address = CASE WHEN ? != '' THEN ? ELSE address END, 
+              address_detail = CASE WHEN ? != '' THEN ? ELSE address_detail END, 
+              memo = CASE WHEN ? != '' THEN ? ELSE memo END,
+              updated_at = ? 
+            WHERE id = ?`,
+      args: [
+        data.name,
+        data.address || "",
+        data.address || "",
+        data.address_detail || "",
+        data.address_detail || "",
+        data.memo || "",
+        data.memo || "",
+        now,
+        id,
+      ],
+    });
+    return { id, isNew: false };
+  } else {
+    const res = await db.execute({
+      sql: `INSERT INTO customers (name, phone, phone2, address, address_detail, memo, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        data.name,
+        data.phone,
+        data.phone2 || "",
+        data.address || "",
+        data.address_detail || "",
+        data.memo || "",
+        now,
+        now,
+      ],
+    });
+    return { id: Number(res.lastInsertRowid), isNew: true };
+  }
+}
+
+export async function batchCreateCustomersService(
+  customersList: Array<{
+    name: string;
+    phone: string;
+    address?: string;
+    address_detail?: string;
+    memo?: string;
+  }>
+) {
+  let createdCount = 0;
+  let updatedCount = 0;
+
+  for (const c of customersList) {
+    if (!c.name || !c.phone) continue;
+    const res = await createCustomerService(c);
+    if (res.isNew) createdCount++;
+    else updatedCount++;
+  }
+
+  return { createdCount, updatedCount, total: customersList.length };
+}

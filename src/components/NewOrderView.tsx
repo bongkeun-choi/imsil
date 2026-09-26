@@ -14,6 +14,7 @@ import {
   History,
   FileText,
   RefreshCw,
+  Smartphone,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
@@ -27,6 +28,7 @@ import {
   confirmImportedOrder,
   AnalyzedImportResult,
 } from "@/lib/orderImportService";
+import { isContactPickerSupported, pickContactsFromDevice } from "@/lib/contactHelper";
 
 interface NewOrderViewProps {
   settings: {
@@ -119,6 +121,27 @@ export function NewOrderView({
     setAddress(cust.address || "");
     setAddressDetail(cust.address_detail || "");
     setCustomerSuggestions([]);
+  };
+
+  // 스마트폰 연락처에서 가져오기
+  const handlePickContactForOrder = async () => {
+    if (!isContactPickerSupported()) {
+      alert(
+        "현재 브라우저는 스마트폰 주소록 직접 호출을 지원하지 않습니다. [고객 장부] 메뉴에서 연락처 파일(.vcf)을 가져오시거나 직접 등록하실 수 있습니다."
+      );
+      return;
+    }
+    try {
+      const picked = await pickContactsFromDevice(false);
+      if (picked && picked.length > 0) {
+        const c = picked[0];
+        if (c.phone) setPhone(c.phone);
+        if (c.name) setName(c.name);
+        if (c.address && !address) setAddress(c.address);
+      }
+    } catch (e: any) {
+      console.error("연락처 선택 실패:", e);
+    }
   };
 
   // --- 스마트 분석 파이프라인 (문자 텍스트 또는 이미지 분석) ---
@@ -516,9 +539,20 @@ export function NewOrderView({
           {/* 고객명 & 연락처 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-lg font-bold text-slate-900 mb-1.5">
-                전화번호 <span className="text-red-600">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-lg font-bold text-slate-900">
+                  전화번호 <span className="text-red-600">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handlePickContactForOrder}
+                  className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-300 cursor-pointer active:scale-95 transition-all"
+                  title="스마트폰 주소록에서 연락처 선택"
+                >
+                  <Smartphone className="w-4 h-4 text-emerald-700" />
+                  <span>핸드폰 연락처 선택</span>
+                </button>
+              </div>
               <input
                 type="tel"
                 value={phone}
