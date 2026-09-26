@@ -9,7 +9,7 @@ import { CustomerView } from "@/components/CustomerView";
 import { SettingsView } from "@/components/SettingsView";
 import { TursoConfigModal } from "@/components/TursoConfigModal";
 import { fetchSettingsService } from "@/lib/services";
-import { getStoredTursoConfig, saveTursoConfig, initClientTables, getClientDb } from "@/lib/clientDb";
+import { initClientTables, getClientDb } from "@/lib/clientDb";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -29,29 +29,16 @@ export default function Home() {
         setSettings(data.settings);
       }
     } catch (e: any) {
-      if (e.message === "DB_NOT_CONFIGURED") {
-        setShowConfigModal(true);
-      }
+      console.error("설정 로드 실패:", e);
     }
   }, []);
 
   useEffect(() => {
-    // 1. 만약 로컬스토리지에 Turso 설정이 없는데 환경변수가 주입되어 있는 경우 (로컬 개발 편의)
-    const existing = getStoredTursoConfig();
-    if (!existing) {
-      const defaultUrl = process.env.NEXT_PUBLIC_TURSO_DATABASE_URL || "";
-      const defaultToken = process.env.NEXT_PUBLIC_TURSO_AUTH_TOKEN || "";
-      if (defaultUrl && defaultToken) {
-        saveTursoConfig({ url: defaultUrl, authToken: defaultToken });
-        const db = getClientDb();
-        if (db) initClientTables(db).catch(console.error);
-      } else {
-        // 없으면 설정 모달 띄우기
-        setShowConfigModal(true);
-      }
-    }
-
-    loadSettings();
+    // 접속하자마자 기본 Turso DB와 자동 연결 및 초기화 수행
+    const db = getClientDb();
+    initClientTables(db)
+      .then(() => loadSettings())
+      .catch((err) => console.error("초기화 오류:", err));
   }, [loadSettings]);
 
   const handleTabChange = (tab: string) => {
@@ -74,7 +61,7 @@ export default function Home() {
           <DashboardView
             onGoToNewOrder={() => handleTabChange("new-order")}
             onGoToShipments={() => handleTabChange("shipments")}
-            onRequestConfig={() => setShowConfigModal(true)}
+            onRequestConfig={() => {}}
           />
         )}
 
@@ -82,20 +69,18 @@ export default function Home() {
           <NewOrderView
             settings={settings}
             onOrderSaved={() => handleTabChange("dashboard")}
-            onRequestConfig={() => setShowConfigModal(true)}
+            onRequestConfig={() => {}}
           />
         )}
 
         {activeTab === "shipments" && (
           <ShipmentView
             settings={settings}
-            onRequestConfig={() => setShowConfigModal(true)}
+            onRequestConfig={() => {}}
           />
         )}
 
-        {activeTab === "customers" && (
-          <CustomerView onRequestConfig={() => setShowConfigModal(true)} />
-        )}
+        {activeTab === "customers" && <CustomerView onRequestConfig={() => {}} />}
 
         {activeTab === "settings" && (
           <SettingsView
@@ -112,19 +97,19 @@ export default function Home() {
             {settings.shop_name || "임실 절임배추"} 주문·출고 관리 프로그램
           </p>
           <p className="text-xs text-slate-500">
-            GitHub Pages 완전 무료 정적 PWA &middot; 클라이언트 직접 Turso DB 연동 &middot; 모바일 확대/축소 지원
+            현장 전용 웹앱 &middot; 모바일 확대/축소 지원
           </p>
         </div>
       </footer>
 
-      {/* Turso DB 연결 모달 */}
+      {/* Turso DB 연결 정보 모달 (설정 탭에서 필요할 때만 열림) */}
       <TursoConfigModal
         isOpen={showConfigModal}
         onConfigSaved={() => {
           setShowConfigModal(false);
           loadSettings();
         }}
-        onClose={getStoredTursoConfig() ? () => setShowConfigModal(false) : undefined}
+        onClose={() => setShowConfigModal(false)}
       />
     </div>
   );
