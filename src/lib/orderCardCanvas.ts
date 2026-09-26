@@ -46,9 +46,8 @@ export async function generateOrderCardImage(
   const isBrowser = typeof window !== "undefined";
   const basePath =
     isBrowser && window.location.pathname.startsWith("/imsil") ? "/imsil" : "";
-  const primaryTemplateUrl = `${basePath}/images/template_extended_clean.png`;
-  const fallbackTemplateUrl = `/images/template_extended_clean.png`;
-  const legacyTemplateUrl = `${basePath}/images/template_clean.png`;
+  const primaryTemplateUrl = `${basePath}/images/template_clean.png`;
+  const fallbackTemplateUrl = `/images/template_clean.png`;
 
   let templateImg: HTMLImageElement | null = null;
   if (isBrowser) {
@@ -57,12 +56,8 @@ export async function generateOrderCardImage(
     } catch {
       try {
         templateImg = await loadTemplateImage(fallbackTemplateUrl);
-      } catch {
-        try {
-          templateImg = await loadTemplateImage(legacyTemplateUrl);
-        } catch (err) {
-          console.warn("템플릿 이미지 로드 실패, 벡터 카드로 대체 렌더링합니다:", err);
-        }
+      } catch (err) {
+        console.warn("템플릿 이미지 로드 실패, 벡터 카드로 대체 렌더링합니다:", err);
       }
     }
   }
@@ -78,16 +73,18 @@ export async function generateOrderCardImage(
 
 /**
  * 장모님 절임배추 템플릿 기반 2x 레티나 합성 렌더러
+ * - 원본 포스터(0~1024px)의 비례와 배추/글씨/아이콘을 100% 온전하게 보존
+ * - 하단(y=1024~)에 깔끔한 전용 배송 정보 및 수령인 안내 카드를 부착
  */
 function renderJangmonimTemplateCard(
   templateImg: HTMLImageElement,
   data: OrderCardData
 ): Promise<{ dataUrl: string; file: File; blob: Blob }> {
-  const isExtended = templateImg.naturalHeight >= 1100;
   const baseW = 682;
-  const baseH = isExtended ? 1124 : 1024;
-  const dy = isExtended ? 100 : 0;
-  const scale = 2; // 초고해상도 (1364 x 2248) 2x Retina 지원
+  const originalH = 1024;
+  const bottomExtensionH = 126;
+  const baseH = originalH + bottomExtensionH; // 1150px
+  const scale = 2; // 초고해상도 (1364 x 2300) 2x Retina 지원
 
   const canvas = document.createElement("canvas");
   canvas.width = baseW * scale;
@@ -101,8 +98,12 @@ function renderJangmonimTemplateCard(
   // 2x 스케일링 적용
   ctx.scale(scale, scale);
 
-  // 1. 깨끗한 베이스 템플릿 이미지 그리기
-  ctx.drawImage(templateImg, 0, 0, baseW, baseH);
+  // 배경 캔버스 흰색 채우기
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillRect(0, 0, baseW, baseH);
+
+  // 1. 깨끗한 베이스 템플릿 원본 이미지 그리기 (0 ~ 1024)
+  ctx.drawImage(templateImg, 0, 0, baseW, originalH);
 
   // 폰트 설정
   const FONT_FAMILY =
@@ -122,7 +123,7 @@ function renderJangmonimTemplateCard(
   const unitPriceFormatted = unitPrice.toLocaleString() + "원";
   const totalAmountFormatted = totalAmount.toLocaleString() + "원";
 
-  // 도착일 포맷팅 (예: 11월 20일(금) 도착)
+  // 도착일 포맷팅 (예: 9월 28일(월) 도착)
   let dateFormatted = data.shippingDate;
   if (data.shippingDate) {
     try {
@@ -137,87 +138,19 @@ function renderJangmonimTemplateCard(
   }
 
   // ==========================================
-  // [상단 확장 영역] 주문자 기본정보 & 배송지 주소 카드
-  // ==========================================
-  if (isExtended) {
-    const cardX = 56;
-    const cardY = 460;
-    const cardW = 570;
-    const cardH = 88;
-
-    // 배경 박스 (화사한 파스텔 민트/에메랄드)
-    drawRoundedBox(ctx, cardX, cardY, cardW, cardH, 14, "#F0FDF4", "#86EFAC");
-
-    // 🏠 집 모양 배지 원
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cardX + 28, cardY + 28, 15, 0, Math.PI * 2);
-    ctx.fillStyle = "#10B981";
-    ctx.fill();
-    ctx.restore();
-
-    // 🏠 아이콘 이모지
-    ctx.font = "15px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("🏠", cardX + 28, cardY + 28);
-
-    // 1행: 받는 분 & 전화번호
-    const textLeft = cardX + 52;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-
-    // "받는 분: " 태그
-    ctx.font = `900 16px ${FONT_FAMILY}`;
-    ctx.fillStyle = "#047857";
-    ctx.fillText("받는 분: ", textLeft, cardY + 24);
-    const tag1W = ctx.measureText("받는 분: ").width;
-
-    // 고객 이름
-    ctx.font = `900 19px ${FONT_FAMILY}`;
-    ctx.fillStyle = "#0F172A";
-    const custName = `${data.customerName || "고객"} 님`;
-    ctx.fillText(custName, textLeft + tag1W, cardY + 24);
-    const nameW = ctx.measureText(custName).width;
-
-    // 고객 전화번호
-    if (data.customerPhone) {
-      ctx.font = `800 16px ${FONT_FAMILY}`;
-      ctx.fillStyle = "#4B5563";
-      ctx.fillText(` (${data.customerPhone})`, textLeft + tag1W + nameW, cardY + 24);
-    }
-
-    // 2행: 배송지 주소
-    ctx.font = `900 16px ${FONT_FAMILY}`;
-    ctx.fillStyle = "#047857";
-    ctx.fillText("배송지: ", textLeft, cardY + 50);
-    const tag2W = ctx.measureText("배송지: ").width;
-
-    const fullAddr = `${data.shippingAddress || ""} ${data.shippingAddressDetail || ""}`.trim() || "(배송지 주소 확인 필요)";
-    ctx.font = `800 16px ${FONT_FAMILY}`;
-    ctx.fillStyle = "#1E293B";
-    drawTruncatedText(ctx, fullAddr, textLeft + tag2W, cardY + 50, cardW - 70 - tag2W);
-
-    // 3행: 발송 안내 문구
-    ctx.font = `700 13px ${FONT_FAMILY}`;
-    ctx.fillStyle = "#059669";
-    ctx.fillText("※ 안전하고 신선하게 포장하여 도착 희망일 전날 우체국택배로 발송됩니다.", textLeft, cardY + 72);
-  }
-
-  // ==========================================
-  // [1행] 상품명: 절임배추 20kg
+  // [1행] 상품명: 절임배추 20kg (원래 위치 y=489)
   // ==========================================
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.font = `900 24px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0B6B38"; // 짙은 자연 에메랄드 그린
-  ctx.fillText("절임배추 20kg", 265, 489 + dy);
+  ctx.fillText("절임배추 20kg", 265, 489);
 
   // ==========================================
-  // [2행] 주문수량: 20kg N박스 주문하셨습니다.
+  // [2행] 주문수량: 20kg N박스 주문하셨습니다. (원래 위치 y=553)
   // ==========================================
   const startX2 = 258;
-  const y2 = 553 + dy;
+  const y2 = 553;
   ctx.font = `900 27px ${FONT_FAMILY}`;
   ctx.fillStyle = "#D92D20"; // 강조 빨강
   const qtyText = `20kg ${qty}박스`;
@@ -229,11 +162,11 @@ function renderJangmonimTemplateCard(
   ctx.fillText(" 주문하셨습니다.", startX2 + qtyWidth, y2);
 
   // ==========================================
-  // [3행] 금액: 박스당 68,000원 / (총 N박스 = XXX,XXX원)
+  // [3행] 금액: 박스당 68,000원 / (총 N박스 = XXX,XXX원) (원래 위치 y=612)
   // ==========================================
   const startX3 = 258;
-  const y3_1 = 612 + dy;
-  const y3_2 = 642 + dy;
+  const y3_1 = 612;
+  const y3_2 = 642;
 
   ctx.font = `800 21px ${FONT_FAMILY}`;
   ctx.fillStyle = "#1E293B";
@@ -249,34 +182,34 @@ function renderJangmonimTemplateCard(
   ctx.fillText(`(총 ${qty}박스 = ${totalAmountFormatted})`, startX3, y3_2);
 
   // ==========================================
-  // [4행] 연락처: 010-XXXX-XXXX
+  // [4행] 연락처: 010-XXXX-XXXX (원래 위치 y=695)
   // ==========================================
   const phoneText = data.shopPhone || "010-8452-9988";
   ctx.font = `900 26px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0F172A";
-  ctx.fillText(phoneText, 258, 695 + dy);
+  ctx.fillText(phoneText, 258, 695);
 
   // ==========================================
-  // [5행] 계좌번호: 은행명 계좌번호 / (예금주: OOO)
+  // [5행] 계좌번호: 은행명 계좌번호 / (예금주: OOO) (원래 위치 y=750)
   // ==========================================
   const bankTitle = `${data.bankName || "농협"} ${data.bankAccount || ""}`.trim();
   const ownerTitle = data.ownerName ? `(예금주: ${data.ownerName})` : "";
   ctx.font = `900 22px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0F172A";
-  ctx.fillText(bankTitle, 258, 750 + dy);
+  ctx.fillText(bankTitle, 258, 750);
 
   if (ownerTitle) {
     ctx.font = `700 17px ${FONT_FAMILY}`;
     ctx.fillStyle = "#475569";
-    ctx.fillText(ownerTitle, 258, 778 + dy);
+    ctx.fillText(ownerTitle, 258, 778);
   }
 
   // ==========================================
-  // [6행] 도착일: M월 D일(요일) 도착으로 주문하셨습니다.
+  // [6행] 도착일: M월 D일(요일) 도착으로 주문하셨습니다. (원래 위치 y=828)
   // ==========================================
   const startX6 = 258;
-  const y6_1 = 828 + dy;
-  const y6_2 = 858 + dy;
+  const y6_1 = 828;
+  const y6_2 = 858;
 
   ctx.font = `900 25px ${FONT_FAMILY}`;
   ctx.fillStyle = "#D92D20"; // 강조 빨강
@@ -290,6 +223,98 @@ function renderJangmonimTemplateCard(
   ctx.font = `800 20px ${FONT_FAMILY}`;
   ctx.fillStyle = "#1E293B";
   ctx.fillText("주문하셨습니다.", startX6, y6_2);
+
+  // ==========================================
+  // [하단 영역: y=1032] 배송 정보 및 수령인 안내 카드
+  // ==========================================
+  const cardX = 18;
+  const cardY = 1032;
+  const cardW = 646;
+  const cardH = 106;
+
+  // 카드 외곽선 및 배경
+  drawRoundedBox(ctx, cardX, cardY, cardW, cardH, 16, "#F0FDF4", "#10B981");
+
+  // 카드 헤더 (아이콘 + 제목)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cardX + 24, cardY + 20, 13, 0, Math.PI * 2);
+  ctx.fillStyle = "#10B981";
+  ctx.fill();
+  ctx.restore();
+
+  ctx.font = "14px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("📦", cardX + 24, cardY + 21);
+
+  ctx.textAlign = "left";
+  ctx.font = `900 17px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#065F46";
+  ctx.fillText("배송 정보 및 수령인 안내", cardX + 44, cardY + 21);
+
+  // 우측 "우체국택배 발송" 배지
+  const badgeW = 132;
+  const badgeH = 24;
+  const badgeX = cardX + cardW - badgeW - 14;
+  const badgeY = cardY + 8;
+  drawRoundedBox(ctx, badgeX, badgeY, badgeW, badgeH, 12, "#DCFCE7", "#86EFAC");
+
+  ctx.textAlign = "center";
+  ctx.font = `800 12px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#15803D";
+  ctx.fillText("우체국택배 발송", badgeX + badgeW / 2, badgeY + badgeH / 2 + 1);
+
+  // 헤더 하단 구분선
+  ctx.beginPath();
+  ctx.moveTo(cardX + 18, cardY + 36);
+  ctx.lineTo(cardX + cardW - 18, cardY + 36);
+  ctx.strokeStyle = "#D1FAE5";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 1행: 받는 분 & 고객 전화번호
+  const rowTextLeft = cardX + 22;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+
+  ctx.font = `900 16px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#047857";
+  ctx.fillText("받는 분: ", rowTextLeft, cardY + 56);
+  const label1W = ctx.measureText("받는 분: ").width;
+
+  ctx.font = `900 19px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#0F172A";
+  const nameStr = `${data.customerName || "고객"} 님`;
+  ctx.fillText(nameStr, rowTextLeft + label1W, cardY + 56);
+  const nameWidth = ctx.measureText(nameStr).width;
+
+  if (data.customerPhone) {
+    ctx.font = `800 16px ${FONT_FAMILY}`;
+    ctx.fillStyle = "#4B5563";
+    ctx.fillText(` (${data.customerPhone})`, rowTextLeft + label1W + nameWidth, cardY + 56);
+  }
+
+  // 2행: 배송지 주소
+  ctx.font = `900 16px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#047857";
+  ctx.fillText("배송지: ", rowTextLeft, cardY + 80);
+  const label2W = ctx.measureText("배송지: ").width;
+
+  const fullAddr = `${data.shippingAddress || ""} ${data.shippingAddressDetail || ""}`.trim() || "(배송지 주소 확인 필요)";
+  ctx.font = `800 16px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#1E293B";
+  drawTruncatedText(ctx, fullAddr, rowTextLeft + label2W, cardY + 80, cardW - 60 - label2W);
+
+  // 하단 우측 팁 문구
+  ctx.textAlign = "right";
+  ctx.font = `700 11.5px ${FONT_FAMILY}`;
+  ctx.fillStyle = "#059669";
+  ctx.fillText(
+    "※ 신선하고 안전하게 포장하여 도착 희망일 전날 발송됩니다.",
+    cardX + cardW - 18,
+    cardY + 98
+  );
 
   // Blob & File 생성
   return new Promise((resolve, reject) => {
