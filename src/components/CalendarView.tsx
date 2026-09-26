@@ -9,6 +9,8 @@ import {
   Clock,
   Phone,
   Plus,
+  X,
+  Package,
 } from "lucide-react";
 import {
   format,
@@ -39,6 +41,7 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState(() =>
     format(new Date(), "yyyy-MM-dd")
   );
+  const [showOrderListModal, setShowOrderListModal] = useState(false);
   const [scheduleData, setScheduleData] = useState<
     Record<string, DayScheduleSummary>
   >({});
@@ -102,6 +105,34 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
     setCurrentDate(today);
     setSelectedDate(format(today, "yyyy-MM-dd"));
   };
+
+  // 날짜 클릭 시 처리: 물량(주문)이 있으면 즉시 팝업 모달 노출!
+  const handleDateClick = (dateStr: string, orderCount: number) => {
+    setSelectedDate(dateStr);
+    if (orderCount > 0) {
+      setShowOrderListModal(true);
+      if (typeof window !== "undefined") {
+        window.history.pushState({ tab: "calendar", modal: "orders" }, "", "#calendar-orders");
+      }
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowOrderListModal(false);
+    if (typeof window !== "undefined" && window.location.hash === "#calendar-orders") {
+      window.history.back();
+    }
+  };
+
+  useEffect(() => {
+    const handlePop = (e: PopStateEvent) => {
+      if (showOrderListModal && e.state?.modal !== "orders") {
+        setShowOrderListModal(false);
+      }
+    };
+    window.addEventListener("popstate", handlePop);
+    return () => window.removeEventListener("popstate", handlePop);
+  }, [showOrderListModal]);
 
   // 월간 달력 날짜 목록
   const daysInMonth = eachDayOfInterval({
@@ -217,7 +248,7 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
               return (
                 <div
                   key={dateStr}
-                  onClick={() => setSelectedDate(dateStr)}
+                  onClick={() => handleDateClick(dateStr, summary?.orderCount || 0)}
                   className={`min-h-[72px] sm:min-h-[85px] md:min-h-[110px] p-1 md:p-2 rounded-lg md:rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                     isSelected
                       ? "border-emerald-600 bg-emerald-50 shadow-md ring-2 ring-emerald-500"
@@ -294,7 +325,7 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
             return (
               <div
                 key={dateStr}
-                onClick={() => setSelectedDate(dateStr)}
+                onClick={() => handleDateClick(dateStr, summary?.orderCount || 0)}
                 className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                   isSelected
                     ? "border-emerald-600 bg-emerald-50 shadow-md ring-2 ring-emerald-500"
@@ -476,6 +507,144 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
           </div>
         )}
       </div>
+
+      {/* 4. 출고 물량 상세 팝업 모달 (날짜 클릭 시 물량이 있으면 즉시 팝업 노출) */}
+      {showOrderListModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 md:p-6 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={handleCloseModal}
+        >
+          <div
+            className="max-w-2xl w-full bg-white rounded-2xl md:rounded-3xl shadow-2xl border-2 border-slate-300 overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 모달 헤더 */}
+            <div className="bg-slate-900 text-white p-4 md:p-6 flex items-center justify-between border-b border-slate-800 shrink-0">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Package className="w-6 h-6 text-emerald-400" />
+                  <h2 className="text-xl md:text-2xl font-black">
+                    {selectedDate} 출고 목록
+                  </h2>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs md:text-sm font-bold">
+                  <span className="bg-emerald-600 text-white px-2.5 py-0.5 rounded-full">
+                    총 {selectedDaySummary.orderCount}건 출고
+                  </span>
+                  <span className="bg-slate-800 text-emerald-300 px-2.5 py-0.5 rounded-full border border-slate-700">
+                    10kg: {selectedDaySummary.qty10kg}개
+                  </span>
+                  <span className="bg-slate-800 text-blue-300 px-2.5 py-0.5 rounded-full border border-slate-700">
+                    20kg: {selectedDaySummary.qty20kg}개
+                  </span>
+                  <span className="bg-slate-800 text-amber-300 px-2.5 py-0.5 rounded-full border border-slate-700">
+                    총 {selectedDaySummary.totalWeight}kg
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+                title="닫기"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* 모달 본문 (주문 리스트) */}
+            <div className="p-4 md:p-6 overflow-y-auto divide-y divide-slate-200 flex-1 space-y-4">
+              {selectedDaySummary.orders.map((ord: any) => (
+                <div key={ord.id} className="pt-3 first:pt-0 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg md:text-xl font-black text-slate-900">
+                        {ord.customer_name}
+                      </span>
+                      <a
+                        href={`tel:${ord.customer_phone?.replace(/[^0-9]/g, "")}`}
+                        className="text-sm md:text-base text-emerald-700 hover:underline font-bold inline-flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200"
+                        title="전화 걸기"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{ord.customer_phone}</span>
+                      </a>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          ord.payment_status === "PAID"
+                            ? "bg-blue-100 text-blue-900 border border-blue-300"
+                            : "bg-red-100 text-red-900 border border-red-300"
+                        }`}
+                      >
+                        {ord.payment_status === "PAID" ? "입금완료" : "미입금"}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          ord.order_status === "SHIPPED"
+                            ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                            : ord.order_status === "PACKED"
+                            ? "bg-amber-100 text-amber-900 border border-amber-300"
+                            : "bg-slate-100 text-slate-800 border border-slate-300"
+                        }`}
+                      >
+                        {ord.order_status === "SHIPPED"
+                          ? "발송완료"
+                          : ord.order_status === "PACKED"
+                          ? "포장완료"
+                          : "포장대기"}
+                      </span>
+                      <span className="text-sm md:text-base font-black text-slate-900 ml-1">
+                        {formatPrice(ord.total_amount)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 배송지 & 품목 요약 */}
+                  <div className="text-sm md:text-base text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div className="font-semibold">
+                      <span className="text-slate-500 font-normal mr-1.5">배송지:</span>
+                      {ord.shipping_address || "주소 미입력"}
+                    </div>
+                    {ord.items_summary && (
+                      <div className="mt-1 font-bold text-emerald-900">
+                        <span className="text-slate-500 font-normal mr-1.5">품목:</span>
+                        {ord.items_summary}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 모달 하단 버튼 바 */}
+            <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  handleCloseModal();
+                  onSelectDateForNewOrder(selectedDate);
+                }}
+                className="flex-1 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-base md:text-lg font-black flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                <span>이 날짜로 주문 추가 등록</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="py-3 px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-base font-bold cursor-pointer transition-colors"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

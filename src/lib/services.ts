@@ -466,7 +466,7 @@ export async function fetchScheduleSummaryService(
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");
 
-  // 1. 기간 내 주문 목록 조회
+  // 1. 기간 내 주문 목록 조회 (품목 요약 포함)
   const ordersResult = await db.execute({
     sql: `
       SELECT 
@@ -479,10 +479,13 @@ export async function fetchScheduleSummaryService(
         o.total_amount,
         o.payment_status,
         o.order_status,
-        s.tracking_no
+        s.tracking_no,
+        GROUP_CONCAT(oi.product_name || ' ' || oi.quantity || '개', ', ') as items_summary
       FROM orders o
       LEFT JOIN shipments s ON s.order_id = o.id
+      LEFT JOIN order_items oi ON oi.order_id = o.id
       WHERE o.shipping_date BETWEEN ? AND ?
+      GROUP BY o.id
       ORDER BY o.shipping_date ASC, o.id ASC
     `,
     args: [startDate, endDate],
