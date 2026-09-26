@@ -437,3 +437,100 @@ export async function fetchCustomerDetailService(id: number) {
     orders: ordersResult.rows,
   };
 }
+
+export interface DayScheduleSummary {
+  date: string;
+  orderCount: number;
+  qty10kg: number;
+  qty20kg: number;
+  totalWeight: number;
+  orders: any[];
+}
+
+export async function fetchScheduleSummaryService(
+  startDate: string,
+  endDate: string
+): Promise<Record<string, DayScheduleSummary>> {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+
+  // 1. 기간 내 주문 목록 조회
+  const ordersResult = await db.execute({
+    sql: `
+      SELECT 
+        o.id,
+        o.order_no,
+        o.customer_name,
+        o.customer_phone,
+        o.shipping_address,
+        o.shipping_date,
+        o.total_amount,
+        o.payment_status,
+        o.order_status,
+        s.tracking_no
+      FROM orders o
+      LEFT JOIN shipments s ON s.order_id = o.id
+      WHERE o.shipping_date BETWEEN ? AND ?
+      ORDER BY o.shipping_date ASC, o.id ASC
+    `,
+    args: [startDate, endDate],
+  });
+
+  // 2. 기간 내 품목별 수량 조회
+  const itemsResult = await db.execute({
+    sql: `
+      SELECT 
+        o.shipping_date,
+        oi.order_id,
+        oi.product_name,
+        oi.weight_kg,
+        oi.quantity
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      WHERE o.shipping_date BETWEEN ? AND ?
+    `,
+    args: [startDate, endDate],
+  });
+
+  const summaryMap: Record<string, DayScheduleSummary> = {};
+
+  // 주문 기본 매핑
+  for (const row of ordersResult.rows) {
+    const sDate = String(row.shipping_date);
+    if (!summaryMap[sDate]) {
+      summaryMap[sDate] = {
+        date: sDate,
+        orderCount: 0,
+        qty10kg: 0,
+        qty20kg: 0,
+        totalWeight: 0,
+        orders: [],
+      };
+    }
+    summaryMap[sDate].orderCount += 1;
+    summaryMap[sDate].orders.push(row);
+  }
+
+  // 품목 수량 및 중량 매핑
+  for (const row of itemsResult.rows) {
+    const sDate = String(row.shipping_date);
+    if (!summaryMap[sDate]) {
+      summaryMap[sDate] = {
+        date: sDate,
+        orderCount: 0,
+        qty10kg: 0,
+        qty20kg: 0,
+        totalWeight: 0,
+        orders: [],
+      };
+    }
+    const weight = Number(row.weight_kg);
+    const qty = Number(row.quantity);
+    if (weight === 10) summaryMap[sDate].qty10kg += qty;
+    if (weight === 20) summaryMap[sDate].qty20kg += qty;
+    summaryMap[sDate].totalWeight += weight * qty;
+  }
+
+  return summaryMap;
+}
+

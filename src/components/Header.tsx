@@ -30,6 +30,7 @@ export function Header({ settings, activeTab, setActiveTab }: HeaderProps) {
 
   const navItems = [
     { id: "dashboard", label: "오늘 출고 현황" },
+    { id: "calendar", label: "출고 달력" },
     { id: "new-order", label: "새 주문 등록" },
     { id: "shipments", label: "출고·택배 관리" },
     { id: "customers", label: "고객 장부" },

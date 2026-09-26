@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Header } from "@/components/Header";
 import { DashboardView } from "@/components/DashboardView";
+import { CalendarView } from "@/components/CalendarView";
 import { NewOrderView } from "@/components/NewOrderView";
 import { ShipmentView } from "@/components/ShipmentView";
 import { CustomerView } from "@/components/CustomerView";
@@ -13,6 +14,9 @@ import { initClientTables, getClientDb } from "@/lib/clientDb";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [orderTargetDate, setOrderTargetDate] = useState<string | undefined>(
+    undefined
+  );
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({
     shop_name: "임실 절임배추",
@@ -46,6 +50,11 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleSelectDateForNewOrder = (dateStr: string) => {
+    setOrderTargetDate(dateStr);
+    handleTabChange("new-order");
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 text-slate-900">
       {/* 상단 실제 상호/전화번호/계좌 안내 및 네비게이션 헤더 */}
@@ -57,31 +66,45 @@ export default function Home() {
 
       {/* 메인 화면 영역 */}
       <main className="flex-1 px-4 py-6 md:py-8 max-w-6xl mx-auto w-full">
+        {/* 1. 홈 / 오늘 출고 현황 (이번 주 7일 스케줄러 포함) */}
         {activeTab === "dashboard" && (
           <DashboardView
-            onGoToNewOrder={() => handleTabChange("new-order")}
+            onGoToNewOrder={() => {
+              setOrderTargetDate(undefined);
+              handleTabChange("new-order");
+            }}
             onGoToShipments={() => handleTabChange("shipments")}
+            onGoToCalendar={() => handleTabChange("calendar")}
             onRequestConfig={() => {}}
           />
         )}
 
+        {/* 2. [신규] 월별·주간별 출고 달력 스케줄러 */}
+        {activeTab === "calendar" && (
+          <CalendarView
+            onSelectDateForNewOrder={handleSelectDateForNewOrder}
+          />
+        )}
+
+        {/* 3. 새 주문 등록 */}
         {activeTab === "new-order" && (
           <NewOrderView
             settings={settings}
+            initialShippingDate={orderTargetDate}
             onOrderSaved={() => handleTabChange("dashboard")}
             onRequestConfig={() => {}}
           />
         )}
 
+        {/* 4. 출고·택배 관리 */}
         {activeTab === "shipments" && (
-          <ShipmentView
-            settings={settings}
-            onRequestConfig={() => {}}
-          />
+          <ShipmentView settings={settings} onRequestConfig={() => {}} />
         )}
 
+        {/* 5. 단골 고객 장부 */}
         {activeTab === "customers" && <CustomerView onRequestConfig={() => {}} />}
 
+        {/* 6. 농가 정보 및 단가 설정 */}
         {activeTab === "settings" && (
           <SettingsView
             onSettingsUpdated={loadSettings}

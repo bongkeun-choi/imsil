@@ -2,26 +2,52 @@
 
 import React, { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
-import { fetchDashboardService, updateOrderActionService } from "@/lib/services";
-import { CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Calendar } from "lucide-react";
+import {
+  fetchDashboardService,
+  updateOrderActionService,
+  fetchScheduleSummaryService,
+  DayScheduleSummary,
+} from "@/lib/services";
+import {
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  RefreshCw,
+  Calendar,
+  CalendarDays,
+} from "lucide-react";
+import { format, addDays, eachDayOfInterval, isSameDay } from "date-fns";
 
 interface DashboardViewProps {
   onGoToNewOrder: () => void;
   onGoToShipments: () => void;
+  onGoToCalendar: () => void;
   onRequestConfig: () => void;
 }
 
 export function DashboardView({
   onGoToNewOrder,
   onGoToShipments,
+  onGoToCalendar,
   onRequestConfig,
 }: DashboardViewProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(() => {
-    return new Date().toISOString().split("T")[0];
+    return format(new Date(), "yyyy-MM-dd");
   });
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  // 이번 주 7일간 스케줄러 데이터
+  const [weeklySchedule, setWeeklySchedule] = useState<
+    Record<string, DayScheduleSummary>
+  >({});
+
+  const today = new Date();
+  const next7Days = eachDayOfInterval({
+    start: today,
+    end: addDays(today, 6),
+  });
 
   const fetchDashboard = async (dateStr: string) => {
     setLoading(true);
@@ -39,8 +65,20 @@ export function DashboardView({
     }
   };
 
+  const fetchWeekly = async () => {
+    try {
+      const startStr = format(today, "yyyy-MM-dd");
+      const endStr = format(addDays(today, 6), "yyyy-MM-dd");
+      const res = await fetchScheduleSummaryService(startStr, endStr);
+      setWeeklySchedule(res);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchDashboard(selectedDate);
+    fetchWeekly();
   }, [selectedDate]);
 
   // 원클릭 입금완료 처리
@@ -50,6 +88,7 @@ export function DashboardView({
     try {
       await updateOrderActionService(orderId, "mark_paid");
       fetchDashboard(selectedDate);
+      fetchWeekly();
     } catch (e) {
       alert("입금 처리에 실패했습니다.");
     } finally {
@@ -76,6 +115,7 @@ export function DashboardView({
 
   const orders = data?.orders || [];
   const unpaidOrders = orders.filter((o: any) => o.payment_status !== "PAID");
+  const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
@@ -96,7 +136,10 @@ export function DashboardView({
 
         <div className="flex gap-2">
           <button
-            onClick={() => fetchDashboard(selectedDate)}
+            onClick={() => {
+              fetchDashboard(selectedDate);
+              fetchWeekly();
+            }}
             className="p-3 text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-300 cursor-pointer"
             title="새로고침"
           >
@@ -115,7 +158,7 @@ export function DashboardView({
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm">
         <div className="border-b border-slate-200 pb-3 mb-5 flex justify-between items-center">
           <h2 className="text-2xl md:text-3xl font-black text-slate-900">
-            오늘 보낼 절임배추
+            {selectedDate} 출고 현황
           </h2>
           <span className="text-base md:text-lg font-bold text-slate-600">
             총 {summary.totalOrders}건 출고 예정
@@ -143,7 +186,7 @@ export function DashboardView({
 
           <div className="bg-slate-100 border-2 border-slate-300 rounded-xl p-5">
             <div className="text-lg md:text-xl font-extrabold text-slate-800 mb-1">
-              오늘 총 중량
+              총 중량
             </div>
             <div className="text-4xl md:text-5xl font-black text-slate-900 stat-number">
               {summary.totalWeight} <span className="text-2xl font-bold">kg</span>
@@ -161,7 +204,96 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* 3. 미입금 확인 및 원클릭 입금 처리 카드 */}
+      {/* 3. [신규 기능] 홈 화면 "이번 주 7일 출고 스케줄러" 위젯 */}
+      <div className="bg-white rounded-2xl border-2 border-emerald-300 p-6 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 pb-3 mb-4">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-6 h-6 text-emerald-700" />
+            <h2 className="text-2xl font-black text-slate-900">
+              이번 주 7일 출고 스케줄러
+            </h2>
+          </div>
+
+          <button
+            onClick={onGoToCalendar}
+            className="inline-flex items-center gap-1.5 text-base font-black text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
+          >
+            <span>월간 달력 전체 보기</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        <p className="text-sm text-slate-600 font-semibold mb-3">
+          날짜 카드를 누르면 해당 날짜의 출고 현황과 주문 목록으로 즉시 전환됩니다:
+        </p>
+
+        {/* 7일간 카드 가로 스크롤/그리드 */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2.5">
+          {next7Days.map((day) => {
+            const dateStr = format(day, "yyyy-MM-dd");
+            const isSelected = selectedDate === dateStr;
+            const isToday = isSameDay(day, today);
+            const sched = weeklySchedule[dateStr];
+            const count = sched?.orderCount || 0;
+            const dayName = dayNames[day.getDay()];
+
+            return (
+              <button
+                key={dateStr}
+                type="button"
+                onClick={() => setSelectedDate(dateStr)}
+                className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[110px] ${
+                  isSelected
+                    ? "border-emerald-600 bg-emerald-100/80 shadow-md ring-2 ring-emerald-500"
+                    : count > 0
+                    ? "border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100"
+                    : "border-slate-200 bg-slate-50 hover:bg-white"
+                }`}
+              >
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span
+                      className={`text-sm font-black ${
+                        day.getDay() === 0
+                          ? "text-red-600"
+                          : day.getDay() === 6
+                          ? "text-blue-600"
+                          : "text-slate-800"
+                      }`}
+                    >
+                      {dayName} {format(day, "d")}일
+                    </span>
+                    {isToday && (
+                      <span className="text-[10px] font-black bg-slate-900 text-white px-1 py-0.5 rounded-sm">
+                        오늘
+                      </span>
+                    )}
+                  </div>
+
+                  {count > 0 ? (
+                    <div className="space-y-0.5 text-xs font-black">
+                      <div className="text-emerald-900">10k: {sched.qty10kg}개</div>
+                      <div className="text-blue-900">20k: {sched.qty20kg}개</div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 py-1 font-medium">
+                      예약 없음
+                    </div>
+                  )}
+                </div>
+
+                {count > 0 && (
+                  <div className="text-right text-xs font-black text-slate-800 border-t border-emerald-200 pt-1">
+                    {count}건 ({sched.totalWeight}kg)
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. 미입금 확인 및 원클릭 입금 처리 카드 */}
       <div className="bg-white rounded-2xl border-2 border-amber-300 p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-3 mb-4">
           <div className="flex items-center gap-2">
@@ -215,11 +347,11 @@ export function DashboardView({
         )}
       </div>
 
-      {/* 4. 오늘 출고 목록 */}
+      {/* 5. 선택된 일자 출고 목록 */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-slate-900">
-            오늘 출고 목록 ({orders.length}명)
+            {selectedDate} 출고 목록 ({orders.length}명)
           </h2>
         </div>
 

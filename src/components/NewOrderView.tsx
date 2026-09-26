@@ -19,12 +19,14 @@ interface NewOrderViewProps {
   };
   onOrderSaved: () => void;
   onRequestConfig: () => void;
+  initialShippingDate?: string;
 }
 
 export function NewOrderView({
   settings,
   onOrderSaved,
   onRequestConfig,
+  initialShippingDate,
 }: NewOrderViewProps) {
   // 고객 정보
   const [phone, setPhone] = useState("");
@@ -41,10 +43,16 @@ export function NewOrderView({
   const [qty10kg, setQty10kg] = useState(0);
   const [qty20kg, setQty20kg] = useState(1); // 기본 20kg 1박스
 
-  // 출고일 (기본값: 내일 날짜)
+  // 출고일 (달력에서 선택한 날짜가 있으면 우선 반영)
   const [shippingDate, setShippingDate] = useState(() => {
-    return format(addDays(new Date(), 1), "yyyy-MM-dd");
+    return initialShippingDate || format(addDays(new Date(), 1), "yyyy-MM-dd");
   });
+
+  useEffect(() => {
+    if (initialShippingDate) {
+      setShippingDate(initialShippingDate);
+    }
+  }, [initialShippingDate]);
 
   // 입금 상태
   const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
