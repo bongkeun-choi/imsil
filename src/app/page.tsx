@@ -8,6 +8,7 @@ import { NewOrderView } from "@/components/NewOrderView";
 import { ShipmentView } from "@/components/ShipmentView";
 import { CustomerView } from "@/components/CustomerView";
 import { SettingsView } from "@/components/SettingsView";
+import { SmartOrderImportView } from "@/components/SmartOrderImportView";
 import { fetchSettingsService } from "@/lib/services";
 import { initClientTables, getClientDb } from "@/lib/clientDb";
 
@@ -71,6 +72,7 @@ export default function Home() {
               setOrderTargetDate(undefined);
               handleTabChange("new-order");
             }}
+            onGoToSmartImport={() => handleTabChange("smart-import")}
             onGoToShipments={() => handleTabChange("shipments")}
             onGoToCalendar={() => handleTabChange("calendar")}
             onRequestConfig={() => {}}
@@ -84,7 +86,15 @@ export default function Home() {
           />
         )}
 
-        {/* 3. 새 주문 등록 */}
+        {/* 3. [신규] 문자 주문 스마트 가져오기 (OCR & 파서) */}
+        {activeTab === "smart-import" && (
+          <SmartOrderImportView
+            onOrderCreated={() => handleTabChange("dashboard")}
+            onNavigateTab={handleTabChange}
+          />
+        )}
+
+        {/* 4. 새 주문 직접 등록 */}
         {activeTab === "new-order" && (
           <NewOrderView
             settings={settings}

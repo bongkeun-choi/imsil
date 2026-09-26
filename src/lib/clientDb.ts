@@ -165,6 +165,63 @@ export async function initClientTables(client: Client): Promise<void> {
       );
     `);
 
+    // 스마트 주문 관리 (OCR / 문자 임포트 및 중복 검사) 테이블
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS order_imports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_type TEXT NOT NULL,
+        source_image TEXT,
+        ocr_text TEXT,
+        parsed_json TEXT,
+        status TEXT NOT NULL DEFAULT 'PROCESSING',
+        created_at TEXT NOT NULL,
+        completed_at TEXT
+      );
+    `);
+
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS order_sources (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER,
+        import_id INTEGER,
+        source_type TEXT NOT NULL,
+        image_path TEXT,
+        ocr_text TEXT,
+        parsed_json TEXT,
+        confidence REAL DEFAULT 1.0,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(order_id) REFERENCES orders(id),
+        FOREIGN KEY(import_id) REFERENCES order_imports(id)
+      );
+    `);
+
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS customer_match_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_id INTEGER NOT NULL,
+        customer_id INTEGER,
+        score REAL NOT NULL,
+        match_type TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(import_id) REFERENCES order_imports(id),
+        FOREIGN KEY(customer_id) REFERENCES customers(id)
+      );
+    `);
+
+    await client.execute(`
+      CREATE TABLE IF NOT EXISTS duplicate_checks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_id INTEGER NOT NULL,
+        order_id INTEGER,
+        score REAL NOT NULL,
+        reason TEXT,
+        decision TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY(import_id) REFERENCES order_imports(id),
+        FOREIGN KEY(order_id) REFERENCES orders(id)
+      );
+    `);
+
     const defaultSettings = [
       { key: "shop_name", value: "임실 절임배추" },
       { key: "shop_phone", value: "010-0000-0000" },

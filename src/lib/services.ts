@@ -21,6 +21,18 @@ export async function fetchSettingsService() {
   };
 }
 
+export async function fetchProductsService(): Promise<{ id: number; name: string; weight_kg: number; price: number }[]> {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const res = await db.execute("SELECT id, name, weight_kg, price FROM products WHERE active = 1 ORDER BY weight_kg ASC");
+  return res.rows.map((r) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    weight_kg: Number(r.weight_kg),
+    price: Number(r.price),
+  }));
+}
+
 export async function saveSettingsService(
   settings: Record<string, string>,
   products?: { id: number; price: number }[]
