@@ -2,18 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Save, Building2, Phone, Tag, Database } from "lucide-react";
+import { Save, Building2, Phone, Tag } from "lucide-react";
 import { fetchSettingsService, saveSettingsService } from "@/lib/services";
-import { getStoredTursoConfig } from "@/lib/clientDb";
 
 interface SettingsViewProps {
   onSettingsUpdated: () => void;
-  onRequestConfig: () => void;
 }
 
 export function SettingsView({
   onSettingsUpdated,
-  onRequestConfig,
 }: SettingsViewProps) {
   const [shopName, setShopName] = useState("");
   const [shopPhone, setShopPhone] = useState("");
@@ -29,7 +26,6 @@ export function SettingsView({
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const currentTurso = getStoredTursoConfig();
 
   useEffect(() => {
     fetchSettingsService()
@@ -56,12 +52,10 @@ export function SettingsView({
         }
       })
       .catch((e) => {
-        if (e.message === "DB_NOT_CONFIGURED") {
-          onRequestConfig();
-        }
+        console.error("Failed to load settings:", e);
       })
       .finally(() => setLoading(false));
-  }, [onRequestConfig]);
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,28 +95,7 @@ export function SettingsView({
 
   return (
     <div className="max-w-3xl mx-auto pb-20 space-y-6">
-      {/* 1. Turso DB 연결 상태 카드 */}
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xl font-black text-slate-900">
-            <Database className="w-5 h-5 text-emerald-700" />
-            <span>Turso 데이터베이스 연결 정보</span>
-          </div>
-          <p className="text-sm text-slate-600 mt-1 font-mono truncate max-w-md">
-            연결 URL: {currentTurso?.url || "미설정"}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onRequestConfig}
-          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm cursor-pointer transition-colors"
-        >
-          DB 연결 정보 변경
-        </button>
-      </div>
-
-      {/* 2. 농가 정보 및 단가 설정 폼 */}
+      {/* 농가 정보 및 단가 설정 폼 */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 md:p-8 shadow-sm">
         <h1 className="text-2xl md:text-3xl font-black text-slate-900 border-b border-slate-200 pb-4 mb-6">
           농가 기본 정보 및 판매 단가 설정

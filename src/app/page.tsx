@@ -8,7 +8,6 @@ import { NewOrderView } from "@/components/NewOrderView";
 import { ShipmentView } from "@/components/ShipmentView";
 import { CustomerView } from "@/components/CustomerView";
 import { SettingsView } from "@/components/SettingsView";
-import { TursoConfigModal } from "@/components/TursoConfigModal";
 import { fetchSettingsService } from "@/lib/services";
 import { initClientTables, getClientDb } from "@/lib/clientDb";
 
@@ -17,7 +16,6 @@ export default function Home() {
   const [orderTargetDate, setOrderTargetDate] = useState<string | undefined>(
     undefined
   );
-  const [showConfigModal, setShowConfigModal] = useState(false);
   const [settings, setSettings] = useState<Record<string, string>>({
     shop_name: "임실 절임배추",
     shop_phone: "010-0000-0000",
@@ -106,10 +104,7 @@ export default function Home() {
 
         {/* 6. 농가 정보 및 단가 설정 */}
         {activeTab === "settings" && (
-          <SettingsView
-            onSettingsUpdated={loadSettings}
-            onRequestConfig={() => setShowConfigModal(true)}
-          />
+          <SettingsView onSettingsUpdated={loadSettings} />
         )}
       </main>
 
@@ -124,16 +119,6 @@ export default function Home() {
           </p>
         </div>
       </footer>
-
-      {/* Turso DB 연결 정보 모달 (설정 탭에서 필요할 때만 열림) */}
-      <TursoConfigModal
-        isOpen={showConfigModal}
-        onConfigSaved={() => {
-          setShowConfigModal(false);
-          loadSettings();
-        }}
-        onClose={() => setShowConfigModal(false)}
-      />
     </div>
   );
 }
