@@ -65,7 +65,7 @@ export default function Home() {
       />
 
       {/* 메인 화면 영역 */}
-      <main className="flex-1 px-4 py-6 md:py-8 max-w-6xl mx-auto w-full">
+      <main className="flex-1 px-2 py-4 md:px-4 md:py-8 max-w-6xl mx-auto w-full">
         {/* 1. 홈 / 오늘 출고 현황 (이번 주 7일 스케줄러 포함) */}
         {activeTab === "dashboard" && (
           <DashboardView

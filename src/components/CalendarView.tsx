@@ -189,13 +189,13 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
       {/* 2. 메인 스케줄러 뷰 */}
       {viewMode === "month" ? (
         /* ================= [월간 달력 보기] ================= */
-        <div className="bg-white rounded-2xl border-2 border-slate-300 p-4 md:p-6 shadow-sm overflow-x-auto">
-          {/* 요일 헤더 */}
-          <div className="grid grid-cols-7 gap-2 text-center mb-2">
+        <div className="bg-white rounded-2xl border-2 border-slate-300 p-2 sm:p-4 md:p-6 shadow-sm w-full">
+          {/* 요일 헤더 (일 ~ 토) */}
+          <div className="grid grid-cols-7 gap-1 md:gap-2 text-center mb-1.5 w-full">
             {dayNames.map((d, i) => (
               <div
                 key={d}
-                className={`py-2 text-lg font-black ${
+                className={`py-1 md:py-2 text-sm md:text-lg font-black ${
                   i === 0 ? "text-red-600" : i === 6 ? "text-blue-600" : "text-slate-800"
                 }`}
               >
@@ -204,8 +204,8 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
             ))}
           </div>
 
-          {/* 달력 날짜 그리드 */}
-          <div className="grid grid-cols-7 gap-2 min-w-[700px]">
+          {/* 달력 날짜 그리드 (모바일 화면 폭 100% 맞춤) */}
+          <div className="grid grid-cols-7 gap-1 md:gap-2 w-full">
             {daysInMonth.map((day) => {
               const dateStr = format(day, "yyyy-MM-dd");
               const isCurrentMonth = isSameMonth(day, currentDate);
@@ -218,21 +218,21 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
                 <div
                   key={dateStr}
                   onClick={() => setSelectedDate(dateStr)}
-                  className={`min-h-[110px] p-2 rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                  className={`min-h-[72px] sm:min-h-[85px] md:min-h-[110px] p-1 md:p-2 rounded-lg md:rounded-xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
                     isSelected
-                      ? "border-emerald-600 bg-emerald-50/80 shadow-md ring-2 ring-emerald-500"
+                      ? "border-emerald-600 bg-emerald-50 shadow-md ring-2 ring-emerald-500"
                       : hasOrders
-                      ? "border-emerald-300 bg-emerald-50/30 hover:bg-emerald-50"
+                      ? "border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50"
                       : isCurrentMonth
                       ? "border-slate-200 bg-white hover:bg-slate-50"
-                      : "border-slate-100 bg-slate-50 opacity-40"
+                      : "border-slate-100 bg-slate-50 opacity-30"
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <span
-                      className={`text-lg font-black ${
+                      className={`text-xs sm:text-sm md:text-lg font-black ${
                         isToday
-                          ? "bg-slate-900 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm"
+                          ? "bg-slate-900 text-white w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center text-[10px] md:text-sm"
                           : day.getDay() === 0
                           ? "text-red-600"
                           : day.getDay() === 6
@@ -244,7 +244,7 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
                     </span>
 
                     {hasOrders && (
-                      <span className="text-xs font-black bg-slate-800 text-white px-1.5 py-0.5 rounded-sm">
+                      <span className="text-[10px] md:text-xs font-black bg-slate-800 text-white px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs">
                         {summary.orderCount}건
                       </span>
                     )}
@@ -252,27 +252,27 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
 
                   {/* 물량 요약 (10kg / 20kg) */}
                   {hasOrders ? (
-                    <div className="space-y-1 my-1 text-xs md:text-sm font-black">
+                    <div className="space-y-0.5 md:space-y-1 my-0.5 md:my-1 text-[10px] sm:text-xs md:text-sm font-black leading-tight">
                       {summary.qty10kg > 0 && (
-                        <div className="bg-emerald-100 text-emerald-900 px-1.5 py-0.5 rounded-sm truncate">
-                          10kg: {summary.qty10kg}개
+                        <div className="bg-emerald-100 text-emerald-900 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate">
+                          10k: {summary.qty10kg}개
                         </div>
                       )}
                       {summary.qty20kg > 0 && (
-                        <div className="bg-blue-100 text-blue-900 px-1.5 py-0.5 rounded-sm truncate">
-                          20kg: {summary.qty20kg}개
+                        <div className="bg-blue-100 text-blue-900 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate">
+                          20k: {summary.qty20kg}개
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-xs text-slate-300 font-medium py-2">
-                      출고 없음
+                    <div className="text-[10px] md:text-xs text-slate-300 font-medium py-1 hidden sm:block">
+                      출고없음
                     </div>
                   )}
 
                   {hasOrders && (
-                    <div className="text-right text-xs font-extrabold text-slate-700 stat-number">
-                      총 {summary.totalWeight}kg
+                    <div className="text-right text-[10px] md:text-xs font-extrabold text-slate-700 stat-number">
+                      {summary.totalWeight}kg
                     </div>
                   )}
                 </div>
