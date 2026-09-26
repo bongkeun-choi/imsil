@@ -25,3 +25,25 @@ body {
   font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
 }
+
+/* 모바일 네이티브 앱 환경 최적화 */
+html, body {
+  overscroll-behavior-y: none; /* 상단 당겨서 새로고침 방지 (웹 브라우저 느낌 제거) */
+  -webkit-tap-highlight-color: transparent; /* 터치 시 파란 박스 깜빡임 제거 */
+}
+
+/* 터치 버튼 조작감 향상 */
+button, a, input, select {
+  touch-action: manipulation; /* 더블탭 줌 딜레이 제거하여 앱처럼 즉각 반응 */
+}
+
+/* 텍스트 드래그 방지 (앱 같은 터치 조작감) */
+button, nav {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 아이폰 홈바 / 안드로이드 제스처 바 안전 영역 */
+.pb-safe {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}

@@ -36,6 +36,7 @@ import {
 import { OrderShareModal } from "@/components/OrderShareModal";
 import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
+import { useBackButtonModal } from "@/lib/useBackButtonModal";
 
 interface CalendarViewProps {
   onSelectDateForNewOrder: (dateStr: string) => void;
@@ -55,6 +56,13 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
     Record<string, DayScheduleSummary>
   >({});
   const [loading, setLoading] = useState(false);
+
+  // 모바일 뒤로가기 버튼 시 날짜별 주문목록 팝업 닫기
+  useBackButtonModal(
+    showOrderListModal,
+    () => setShowOrderListModal(false),
+    "calendar-date-orders-modal"
+  );
 
   const handleOpenOrderShare = (ord: any) => {
     const shareData: OrderCardData = {

@@ -32,6 +32,7 @@ import {
 import { isContactPickerSupported, pickContactsFromDevice } from "@/lib/contactHelper";
 import { OrderShareModal } from "@/components/OrderShareModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
+import { useBackButtonModal } from "@/lib/useBackButtonModal";
 
 interface NewOrderViewProps {
   settings: {
@@ -67,6 +68,13 @@ export function NewOrderView({
   const [createdOrderShareData, setCreatedOrderShareData] = useState<OrderCardData | null>(null);
   const [showPostOrderPrompt, setShowPostOrderPrompt] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // 모바일 뒤로가기 버튼 시 주문 완료 안내 팝업 닫기
+  useBackButtonModal(
+    showPostOrderPrompt,
+    () => setShowPostOrderPrompt(false),
+    "new-order-prompt"
+  );
 
   // 2. 상품 및 수량 상태 (현재 판매 상품: 절임배추 20kg 단일 규격)
   const [products, setProducts] = useState<any[]>([]);

@@ -15,6 +15,7 @@ import { format, addDays } from "date-fns";
 import { formatPrice } from "@/lib/utils";
 import { updateOrderDetailService, deleteOrderService } from "@/lib/services";
 import { OrderCardData } from "@/lib/orderCardCanvas";
+import { useBackButtonModal } from "@/lib/useBackButtonModal";
 
 interface OrderEditModalProps {
   order: any;
@@ -47,6 +48,14 @@ export function OrderEditModal({
   // 저장 완료 후 문자/카톡 발송 여부 확인 팝업 상태
   const [savedShareData, setSavedShareData] = useState<OrderCardData | null>(null);
   const [showPostEditPrompt, setShowPostEditPrompt] = useState(false);
+
+  // 모바일 뒤로가기 버튼 연동 (뒤로가기 시 팝업만 안전하게 닫힘)
+  useBackButtonModal(isOpen, onClose, "order-edit-modal");
+  useBackButtonModal(
+    showPostEditPrompt,
+    () => setShowPostEditPrompt(false),
+    "order-post-edit-prompt"
+  );
 
   useEffect(() => {
     if (!isOpen || !order) return;

@@ -2,15 +2,17 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Save, Building2, Phone, Tag } from "lucide-react";
+import { Save, Building2, Phone, Tag, LogOut } from "lucide-react";
 import { fetchSettingsService, saveSettingsService } from "@/lib/services";
 
 interface SettingsViewProps {
   onSettingsUpdated: () => void;
+  onExitClick?: () => void;
 }
 
 export function SettingsView({
   onSettingsUpdated,
+  onExitClick,
 }: SettingsViewProps) {
   const [shopName, setShopName] = useState("");
   const [shopPhone, setShopPhone] = useState("");
@@ -240,6 +242,27 @@ export function SettingsView({
             <Save className="w-6 h-6 text-emerald-400" />
             <span>{saving ? "저장 중..." : "설정 저장하기"}</span>
           </button>
+
+          {/* 프로그램 안전 종료 */}
+          {onExitClick && (
+            <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5 space-y-3 mt-6">
+              <h2 className="text-lg font-black text-red-950 flex items-center gap-2">
+                <LogOut className="w-5 h-5 text-red-600" />
+                <span>프로그램 안전 종료</span>
+              </h2>
+              <p className="text-sm text-slate-600 leading-relaxed font-medium">
+                모든 주문과 변경사항이 데이터베이스에 안전하게 저장되어 있습니다. 작업 종료 후 안심하고 프로그램을 끝내실 수 있습니다.
+              </p>
+              <button
+                type="button"
+                onClick={onExitClick}
+                className="w-full py-3.5 bg-red-600 hover:bg-red-700 active:scale-98 text-white text-base md:text-lg font-black rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <LogOut className="w-5 h-5" />
+                <span>프로그램 종료하기</span>
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

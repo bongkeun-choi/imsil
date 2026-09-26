@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { OrderCardData, generateOrderCardImage } from "@/lib/orderCardCanvas";
+import { useBackButtonModal } from "@/lib/useBackButtonModal";
 
 export function generateOrderShareMessage(data: OrderCardData): string {
   const isPaid = data.paymentStatus === "PAID";
@@ -66,6 +67,9 @@ export function OrderShareModal({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
+
+  // 모바일 뒤로가기 버튼 연동 (뒤로가기 시 모달만 안전하게 닫힘)
+  useBackButtonModal(isOpen, onClose, "order-share-modal");
 
   // 모달 열릴 때 초기화 및 캔버스 이미지 생성
   useEffect(() => {
