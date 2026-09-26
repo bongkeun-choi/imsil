@@ -46,8 +46,9 @@ export async function generateOrderCardImage(
   const isBrowser = typeof window !== "undefined";
   const basePath =
     isBrowser && window.location.pathname.startsWith("/imsil") ? "/imsil" : "";
-  const primaryTemplateUrl = `${basePath}/images/template_clean.png`;
-  const fallbackTemplateUrl = `/images/template_clean.png`;
+  const primaryTemplateUrl = `${basePath}/images/template_extended_clean.png`;
+  const fallbackTemplateUrl = `/images/template_extended_clean.png`;
+  const legacyTemplateUrl = `${basePath}/images/template_clean.png`;
 
   let templateImg: HTMLImageElement | null = null;
   if (isBrowser) {
@@ -56,8 +57,12 @@ export async function generateOrderCardImage(
     } catch {
       try {
         templateImg = await loadTemplateImage(fallbackTemplateUrl);
-      } catch (err) {
-        console.warn("템플릿 이미지 로드 실패, 벡터 카드로 대체 렌더링합니다:", err);
+      } catch {
+        try {
+          templateImg = await loadTemplateImage(legacyTemplateUrl);
+        } catch (err) {
+          console.warn("템플릿 이미지 로드 실패, 벡터 카드로 대체 렌더링합니다:", err);
+        }
       }
     }
   }
@@ -78,9 +83,11 @@ function renderJangmonimTemplateCard(
   templateImg: HTMLImageElement,
   data: OrderCardData
 ): Promise<{ dataUrl: string; file: File; blob: Blob }> {
+  const isExtended = templateImg.naturalHeight >= 1100;
   const baseW = 682;
-  const baseH = 1024;
-  const scale = 2; // 초고해상도 (1364 x 2048) 2x Retina 지원
+  const baseH = isExtended ? 1124 : 1024;
+  const dy = isExtended ? 100 : 0;
+  const scale = 2; // 초고해상도 (1364 x 2248) 2x Retina 지원
 
   const canvas = document.createElement("canvas");
   canvas.width = baseW * scale;
@@ -130,19 +137,87 @@ function renderJangmonimTemplateCard(
   }
 
   // ==========================================
+  // [상단 확장 영역] 주문자 기본정보 & 배송지 주소 카드
+  // ==========================================
+  if (isExtended) {
+    const cardX = 56;
+    const cardY = 460;
+    const cardW = 570;
+    const cardH = 88;
+
+    // 배경 박스 (화사한 파스텔 민트/에메랄드)
+    drawRoundedBox(ctx, cardX, cardY, cardW, cardH, 14, "#F0FDF4", "#86EFAC");
+
+    // 🏠 집 모양 배지 원
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cardX + 28, cardY + 28, 15, 0, Math.PI * 2);
+    ctx.fillStyle = "#10B981";
+    ctx.fill();
+    ctx.restore();
+
+    // 🏠 아이콘 이모지
+    ctx.font = "15px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("🏠", cardX + 28, cardY + 28);
+
+    // 1행: 받는 분 & 전화번호
+    const textLeft = cardX + 52;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+
+    // "받는 분: " 태그
+    ctx.font = `900 16px ${FONT_FAMILY}`;
+    ctx.fillStyle = "#047857";
+    ctx.fillText("받는 분: ", textLeft, cardY + 24);
+    const tag1W = ctx.measureText("받는 분: ").width;
+
+    // 고객 이름
+    ctx.font = `900 19px ${FONT_FAMILY}`;
+    ctx.fillStyle = "#0F172A";
+    const custName = `${data.customerName || "고객"} 님`;
+    ctx.fillText(custName, textLeft + tag1W, cardY + 24);
+    const nameW = ctx.measureText(custName).width;
+
+    // 고객 전화번호
+    if (data.customerPhone) {
+      ctx.font = `800 16px ${FONT_FAMILY}`;
+      ctx.fillStyle = "#4B5563";
+      ctx.fillText(` (${data.customerPhone})`, textLeft + tag1W + nameW, cardY + 24);
+    }
+
+    // 2행: 배송지 주소
+    ctx.font = `900 16px ${FONT_FAMILY}`;
+    ctx.fillStyle = "#047857";
+    ctx.fillText("배송지: ", textLeft, cardY + 50);
+    const tag2W = ctx.measureText("배송지: ").width;
+
+    const fullAddr = `${data.shippingAddress || ""} ${data.shippingAddressDetail || ""}`.trim() || "(배송지 주소 확인 필요)";
+    ctx.font = `800 16px ${FONT_FAMILY}`;
+    ctx.fillStyle = "#1E293B";
+    drawTruncatedText(ctx, fullAddr, textLeft + tag2W, cardY + 50, cardW - 70 - tag2W);
+
+    // 3행: 발송 안내 문구
+    ctx.font = `700 13px ${FONT_FAMILY}`;
+    ctx.fillStyle = "#059669";
+    ctx.fillText("※ 안전하고 신선하게 포장하여 도착 희망일 전날 우체국택배로 발송됩니다.", textLeft, cardY + 72);
+  }
+
+  // ==========================================
   // [1행] 상품명: 절임배추 20kg
   // ==========================================
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.font = `900 24px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0B6B38"; // 짙은 자연 에메랄드 그린
-  ctx.fillText("절임배추 20kg", 265, 489);
+  ctx.fillText("절임배추 20kg", 265, 489 + dy);
 
   // ==========================================
   // [2행] 주문수량: 20kg N박스 주문하셨습니다.
   // ==========================================
   const startX2 = 258;
-  const y2 = 553;
+  const y2 = 553 + dy;
   ctx.font = `900 27px ${FONT_FAMILY}`;
   ctx.fillStyle = "#D92D20"; // 강조 빨강
   const qtyText = `20kg ${qty}박스`;
@@ -157,8 +232,8 @@ function renderJangmonimTemplateCard(
   // [3행] 금액: 박스당 68,000원 / (총 N박스 = XXX,XXX원)
   // ==========================================
   const startX3 = 258;
-  const y3_1 = 612;
-  const y3_2 = 642;
+  const y3_1 = 612 + dy;
+  const y3_2 = 642 + dy;
 
   ctx.font = `800 21px ${FONT_FAMILY}`;
   ctx.fillStyle = "#1E293B";
@@ -176,10 +251,10 @@ function renderJangmonimTemplateCard(
   // ==========================================
   // [4행] 연락처: 010-XXXX-XXXX
   // ==========================================
-  const phoneText = data.shopPhone || data.customerPhone || "010-0000-0000";
+  const phoneText = data.shopPhone || "010-8452-9988";
   ctx.font = `900 26px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0F172A";
-  ctx.fillText(phoneText, 258, 695);
+  ctx.fillText(phoneText, 258, 695 + dy);
 
   // ==========================================
   // [5행] 계좌번호: 은행명 계좌번호 / (예금주: OOO)
@@ -188,20 +263,20 @@ function renderJangmonimTemplateCard(
   const ownerTitle = data.ownerName ? `(예금주: ${data.ownerName})` : "";
   ctx.font = `900 22px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0F172A";
-  ctx.fillText(bankTitle, 258, 750);
+  ctx.fillText(bankTitle, 258, 750 + dy);
 
   if (ownerTitle) {
     ctx.font = `700 17px ${FONT_FAMILY}`;
     ctx.fillStyle = "#475569";
-    ctx.fillText(ownerTitle, 258, 778);
+    ctx.fillText(ownerTitle, 258, 778 + dy);
   }
 
   // ==========================================
   // [6행] 도착일: M월 D일(요일) 도착으로 주문하셨습니다.
   // ==========================================
   const startX6 = 258;
-  const y6_1 = 828;
-  const y6_2 = 858;
+  const y6_1 = 828 + dy;
+  const y6_2 = 858 + dy;
 
   ctx.font = `900 25px ${FONT_FAMILY}`;
   ctx.fillStyle = "#D92D20"; // 강조 빨강
