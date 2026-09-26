@@ -55,23 +55,21 @@ npm run dev
 
 ---
 
-## GitHub Pages 무료 배포 방법 (3단계)
+## 간편 웹앱 배포 방법 (내 컴퓨터에서 1초 배포)
 
-본 프로그램은 서버 없이 GitHub Pages에서 100% 완전 무료로 동작합니다:
+Actions 설정이나 요금 걱정 없이, 내 컴퓨터에서 아래 명령어 한 줄만 치면 GitHub Pages로 즉시 배포됩니다:
 
-1. **GitHub 저장소로 코드 푸시**
-   ```bash
-   git push -u origin main
-   ```
-2. **GitHub 저장소 설정에서 Pages 활성화**
-   - GitHub 저장소(`https://github.com/bongkeun-choi/imsil`)로 이동합니다.
-   - 상단 **Settings** → 좌측 **Pages** 메뉴 클릭.
-   - **Build and deployment > Source** 항목을 `Deploy from a branch`에서 **`GitHub Actions`** 로 변경합니다.
-3. **배포 완료 및 사용**
-   - 상단 **Actions** 탭에서 배포가 1분 만에 자동으로 완료됩니다.
-   - 완료 후 제공되는 주소(`https://bongkeun-choi.github.io/imsil/`)로 스마트폰이나 PC에서 접속합니다.
-   - 첫 접속 시 나타나는 모달 창에 본인의 **Turso DB URL과 Auth Token**을 입력하면 즉시 나만의 전용 주문관리 시스템으로 동작합니다!
-   - 스마트폰 브라우저 메뉴에서 **[홈 화면에 추가]**를 누르면 앱처럼 설치되어 사용할 수 있습니다.
+```bash
+npm run deploy
+```
+
+*(이 명령어는 자동으로 최신 화면을 빌드한 뒤 `gh-pages` 브랜치로 깔끔하게 전송해 줍니다.)*
+
+### GitHub 저장소 설정 (최초 1회만 확인)
+1. GitHub 저장소(`https://github.com/bongkeun-choi/imsil`)의 **Settings** → **Pages** 접속
+2. **Build and deployment > Source**를 **`Deploy from a branch`** 로 선택
+3. **Branch**를 **`gh-pages`** / **`/(root)`** 로 선택하고 **Save** 클릭
+4. 이제 **`https://bongkeun-choi.github.io/imsil/`** 주소로 전 세계 어디서든 웹앱에 접속하실 수 있습니다!
 
 ---
 
