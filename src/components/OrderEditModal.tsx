@@ -83,26 +83,31 @@ export function OrderEditModal({
   // 스마트폰 뒤로가기 버튼 안전 연동
   useEffect(() => {
     if (!isOpen) return;
-    window.history.pushState({ modal: "order-edit" }, "");
+
+    let closedByPop = false;
+    const currentState = window.history.state;
+    if (currentState?.modal !== "order-edit") {
+      window.history.pushState({ ...currentState, modal: "order-edit" }, "");
+    }
 
     const handlePopState = () => {
+      closedByPop = true;
       onClose();
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => {
       window.removeEventListener("popstate", handlePopState);
+      if (!closedByPop && window.history.state?.modal === "order-edit") {
+        window.history.back();
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen || !order) return null;
 
   const handleCloseSafely = () => {
-    if (window.history.state?.modal === "order-edit") {
-      window.history.back();
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   const getDispatchDateStr = (dateStr: string) => {
@@ -198,7 +203,7 @@ export function OrderEditModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-3 backdrop-blur-xs">
+    <div className="fixed inset-0 z-[70] bg-black/70 flex items-center justify-center p-3 backdrop-blur-xs">
       <div className="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border-4 border-slate-700 animate-in fade-in zoom-in duration-150">
         {/* 모달 상단 헤더 */}
         <div className="bg-slate-900 text-white p-4 md:p-5 rounded-t-[20px] flex items-center justify-between shrink-0">

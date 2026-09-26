@@ -562,9 +562,9 @@ export async function fetchOrderByIdService(orderId: number) {
   });
 
   return {
-    ...order,
+    ...(order as any),
     items: itemsRes.rows,
-  };
+  } as any;
 }
 
 export async function fetchCustomersService(query: string = "") {
@@ -640,15 +640,7 @@ export async function fetchScheduleSummaryService(
   const ordersResult = await db.execute({
     sql: `
       SELECT 
-        o.id,
-        o.order_no,
-        o.customer_name,
-        o.customer_phone,
-        o.shipping_address,
-        o.shipping_date,
-        o.total_amount,
-        o.payment_status,
-        o.order_status,
+        o.*,
         s.tracking_no,
         GROUP_CONCAT(oi.product_name || ' ' || oi.quantity || '개', ', ') as items_summary
       FROM orders o

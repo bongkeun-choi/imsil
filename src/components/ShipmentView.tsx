@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
 import { Download, CheckSquare, Square, MessageSquare, Phone, RefreshCw, Edit3, Share2 } from "lucide-react";
 import { format } from "date-fns";
-import { fetchOrdersService, updateOrderActionService } from "@/lib/services";
+import { fetchOrdersService, updateOrderActionService, fetchOrderByIdService } from "@/lib/services";
 import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderShareModal } from "@/components/OrderShareModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
@@ -52,7 +52,7 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
     setSharingOrder(shareData);
   };
 
-  const handleOpenOrderEdit = (ord: any) => {
+  const handleOpenOrderEdit = async (ord: any) => {
     const qty20kg = (ord.items && ord.items[0]?.quantity) || ord.qty20kg || 1;
     setEditingOrder({
       id: ord.id,
@@ -68,7 +68,36 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
       total_amount: Number(ord.total_amount) || 68000 * qty20kg,
       payment_status: ord.payment_status || "UNPAID",
       memo: ord.memo || "",
+      items: ord.items || [],
     });
+
+    if (ord.id) {
+      try {
+        const fullDetail = await fetchOrderByIdService(ord.id);
+        if (fullDetail) {
+          const detailQty20 =
+            (fullDetail.items && fullDetail.items[0]?.quantity) || qty20kg;
+          setEditingOrder({
+            id: fullDetail.id,
+            customer_id: fullDetail.customer_id,
+            order_no: fullDetail.order_no,
+            customer_name: fullDetail.customer_name,
+            customer_phone: fullDetail.customer_phone,
+            shipping_date: fullDetail.shipping_date || selectedDate,
+            shipping_address: fullDetail.shipping_address,
+            shipping_address_detail: fullDetail.shipping_address_detail || "",
+            qty20kg: detailQty20,
+            unit_price: 68000,
+            total_amount: Number(fullDetail.total_amount) || 68000 * detailQty20,
+            payment_status: fullDetail.payment_status || "UNPAID",
+            memo: fullDetail.memo || "",
+            items: fullDetail.items || [],
+          });
+        }
+      } catch (err) {
+        console.error("출고 주문 상세 조회 에러:", err);
+      }
+    }
   };
 
   const handleOrderUpdated = (shareData?: OrderCardData) => {

@@ -31,6 +31,7 @@ import {
 import {
   fetchScheduleSummaryService,
   DayScheduleSummary,
+  fetchOrderByIdService,
 } from "@/lib/services";
 import { OrderShareModal } from "@/components/OrderShareModal";
 import { OrderEditModal } from "@/components/OrderEditModal";
@@ -76,7 +77,10 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
     setSharingOrder(shareData);
   };
 
-  const handleOpenOrderEdit = (ord: any) => {
+  const handleOpenOrderEdit = async (ord: any) => {
+    // 날짜별 주문목록 팝업 모달이 열려있다면 즉시 닫기
+    setShowOrderListModal(false);
+
     const qty20kg = ord.qty20kg || ord.quantity || (ord.items && ord.items[0]?.quantity) || 1;
     setEditingOrder({
       id: ord.id,
@@ -92,7 +96,36 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
       total_amount: Number(ord.total_amount) || 68000 * qty20kg,
       payment_status: ord.payment_status || "UNPAID",
       memo: ord.memo || "",
+      items: ord.items || [],
     });
+
+    if (ord.id) {
+      try {
+        const fullDetail = await fetchOrderByIdService(ord.id);
+        if (fullDetail) {
+          const detailQty20 =
+            (fullDetail.items && fullDetail.items[0]?.quantity) || qty20kg;
+          setEditingOrder({
+            id: fullDetail.id,
+            customer_id: fullDetail.customer_id,
+            order_no: fullDetail.order_no,
+            customer_name: fullDetail.customer_name,
+            customer_phone: fullDetail.customer_phone,
+            shipping_date: fullDetail.shipping_date || selectedDate,
+            shipping_address: fullDetail.shipping_address,
+            shipping_address_detail: fullDetail.shipping_address_detail || "",
+            qty20kg: detailQty20,
+            unit_price: 68000,
+            total_amount: Number(fullDetail.total_amount) || 68000 * detailQty20,
+            payment_status: fullDetail.payment_status || "UNPAID",
+            memo: fullDetail.memo || "",
+            items: fullDetail.items || [],
+          });
+        }
+      } catch (err) {
+        console.error("주문 상세 조회 에러:", err);
+      }
+    }
   };
 
   const handleOrderUpdated = (shareData?: OrderCardData) => {
@@ -643,7 +676,11 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
             {/* 모달 본문 (주문 리스트) */}
             <div className="p-4 md:p-6 overflow-y-auto divide-y divide-slate-200 flex-1 space-y-4">
               {selectedDaySummary.orders.map((ord: any) => (
-                <div key={ord.id} className="pt-3 first:pt-0 space-y-2">
+                <div
+                  key={ord.id}
+                  className="pt-3 first:pt-0 space-y-2 p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-200"
+                  onClick={() => handleOpenOrderEdit(ord)}
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-lg md:text-xl font-black text-slate-900">
@@ -651,6 +688,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                       </span>
                       <a
                         href={`tel:${ord.customer_phone?.replace(/[^0-9]/g, "")}`}
+                        onClick={(e) => e.stopPropagation()}
                         className="text-sm md:text-base text-emerald-700 hover:underline font-bold inline-flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200"
                         title="전화 걸기"
                       >
@@ -659,7 +697,10 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                       </a>
                       <button
                         type="button"
-                        onClick={() => handleOpenOrderShare(ord)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenOrderShare(ord);
+                        }}
                         className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md text-xs font-bold cursor-pointer transition-colors"
                         title="카톡·문자 안내장 보내기"
                       >
@@ -668,15 +709,15 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          handleCloseModal();
-                          setEditingOrder(ord);
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenOrderEdit(ord);
                         }}
-                        className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 px-2 py-0.5 rounded-md text-xs font-bold cursor-pointer transition-colors"
+                        className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg text-xs md:text-sm font-bold cursor-pointer transition-colors shadow-xs"
                         title="주문 정보 수정"
                       >
-                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
-                        <span>수정</span>
+                        <Edit3 className="w-3.5 h-3.5 text-white" />
+                        <span>주문 수정</span>
                       </button>
                     </div>
 
