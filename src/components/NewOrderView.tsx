@@ -29,13 +29,17 @@ import {
   AnalyzedImportResult,
 } from "@/lib/orderImportService";
 import { isContactPickerSupported, pickContactsFromDevice } from "@/lib/contactHelper";
+import { OrderShareModal } from "@/components/OrderShareModal";
+import { OrderCardData } from "@/lib/orderCardCanvas";
 
 interface NewOrderViewProps {
   settings: {
     shop_name?: string;
+    shop_phone?: string;
     bank_name?: string;
     bank_account?: string;
     owner_name?: string;
+    [key: string]: any;
   };
   onOrderSaved: () => void;
   onRequestConfig: () => void;
@@ -58,6 +62,7 @@ export function NewOrderView({
     return initialShippingDate || format(addDays(new Date(), 1), "yyyy-MM-dd");
   });
   const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
+  const [createdOrderShareData, setCreatedOrderShareData] = useState<OrderCardData | null>(null);
 
   // 2. 상품 및 수량 상태
   const [products, setProducts] = useState<any[]>([]);
@@ -315,9 +320,10 @@ export function NewOrderView({
 
     setIsSubmitting(true);
     try {
+      let createdOrderNo = "";
       if (analysisResult?.import_id) {
         // 스마트 가져오기로 생성된 경우 원본 매핑 기록과 함께 확정
-        await confirmImportedOrder({
+        const confRes = await confirmImportedOrder({
           import_id: analysisResult.import_id,
           customer_name: name.trim(),
           customer_phone: phone.trim(),
@@ -328,9 +334,10 @@ export function NewOrderView({
           memo: memo.trim(),
           is_paid: paymentStatus === "PAID",
         });
+        createdOrderNo = confRes.order_no;
       } else {
         // 직접 수기 입력된 경우
-        await createOrderService({
+        const ordRes = await createOrderService({
           name: name.trim(),
           phone: phone.trim(),
           address: address.trim(),
@@ -340,15 +347,42 @@ export function NewOrderView({
           payment_status: paymentStatus,
           memo: memo.trim(),
         });
+        createdOrderNo = ordRes.orderNo;
       }
 
-      alert("주문이 성공적으로 등록되었습니다!");
-      onOrderSaved();
+      const itemsSummary = items
+        .map((it) => `${it.product_name} ${it.quantity}개`)
+        .join(", ");
+
+      const shareData: OrderCardData = {
+        orderNo: createdOrderNo,
+        customerName: name.trim(),
+        customerPhone: phone.trim(),
+        shippingDate: shippingDate,
+        shippingAddress: address.trim(),
+        shippingAddressDetail: addressDetail.trim(),
+        itemsSummary,
+        totalAmount,
+        paymentStatus,
+        memo: memo.trim(),
+        shopName: settings.shop_name || "임실참배추농원",
+        shopPhone: settings.shop_phone || (settings as any).phone || "010-0000-0000",
+        bankName: settings.bank_name || "농협",
+        bankAccount: settings.bank_account || "",
+        ownerName: settings.owner_name || "",
+      };
+
+      setCreatedOrderShareData(shareData);
     } catch (e: any) {
       alert("주문 처리 중 오류가 발생했습니다: " + e.message);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCloseShareModal = () => {
+    setCreatedOrderShareData(null);
+    onOrderSaved();
   };
 
   return (
@@ -787,6 +821,16 @@ export function NewOrderView({
           </button>
         </form>
       </div>
+
+      {/* 주문 등록 완료 후 문자 / 카카오톡 전송 모달 */}
+      {createdOrderShareData && (
+        <OrderShareModal
+          orderData={createdOrderShareData}
+          isOpen={!!createdOrderShareData}
+          onClose={handleCloseShareModal}
+          isNewOrder={true}
+        />
+      )}
     </div>
   );
 }

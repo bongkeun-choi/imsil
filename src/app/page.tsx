@@ -137,6 +137,7 @@ export default function Home() {
         {/* 1. 홈 / 오늘 출고 현황 (이번 주 7일 스케줄러 포함) */}
         {activeTab === "dashboard" && (
           <DashboardView
+            settings={settings}
             onGoToNewOrder={() => {
               setOrderTargetDate(undefined);
               handleTabChange("new-order");
@@ -151,6 +152,7 @@ export default function Home() {
         {activeTab === "calendar" && (
           <CalendarView
             onSelectDateForNewOrder={handleSelectDateForNewOrder}
+            settings={settings}
           />
         )}
 

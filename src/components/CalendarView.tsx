@@ -11,6 +11,7 @@ import {
   Plus,
   X,
   Package,
+  Share2,
 } from "lucide-react";
 import {
   format,
@@ -30,22 +31,47 @@ import {
   fetchScheduleSummaryService,
   DayScheduleSummary,
 } from "@/lib/services";
+import { OrderShareModal } from "@/components/OrderShareModal";
+import { OrderCardData } from "@/lib/orderCardCanvas";
 
 interface CalendarViewProps {
   onSelectDateForNewOrder: (dateStr: string) => void;
+  settings?: any;
 }
 
-export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
+export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarViewProps) {
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(() =>
     format(new Date(), "yyyy-MM-dd")
   );
   const [showOrderListModal, setShowOrderListModal] = useState(false);
+  const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
   const [scheduleData, setScheduleData] = useState<
     Record<string, DayScheduleSummary>
   >({});
   const [loading, setLoading] = useState(false);
+
+  const handleOpenOrderShare = (ord: any) => {
+    const shareData: OrderCardData = {
+      orderNo: ord.order_no || "",
+      customerName: ord.customer_name || "",
+      customerPhone: ord.customer_phone || "",
+      shippingDate: ord.shipping_date || selectedDate,
+      shippingAddress: ord.shipping_address || "",
+      shippingAddressDetail: ord.shipping_address_detail || "",
+      itemsSummary: ord.items_summary || "절임배추",
+      totalAmount: Number(ord.total_amount) || 0,
+      paymentStatus: ord.payment_status || "UNPAID",
+      memo: ord.memo || "",
+      shopName: settings?.shop_name || "임실참배추농원",
+      shopPhone: settings?.shop_phone || settings?.phone || "010-0000-0000",
+      bankName: settings?.bank_name || "농협",
+      bankAccount: settings?.bank_account || "",
+      ownerName: settings?.owner_name || "",
+    };
+    setSharingOrder(shareData);
+  };
 
   // 현재 월의 시작/끝 날짜 (달력 그리드용)
   const monthStart = startOfMonth(currentDate);
@@ -467,6 +493,15 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
                       <Phone className="w-4 h-4" />
                       <span>{ord.customer_phone}</span>
                     </a>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenOrderShare(ord)}
+                      className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                      title="카톡·문자 안내장 보내기"
+                    >
+                      <Share2 className="w-3.5 h-3.5 text-amber-700" />
+                      <span>문자·카톡</span>
+                    </button>
                   </div>
                   <div className="text-base text-slate-700 mt-1">
                     배송지: {ord.shipping_address}
@@ -570,6 +605,15 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
                         <Phone className="w-3.5 h-3.5" />
                         <span>{ord.customer_phone}</span>
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenOrderShare(ord)}
+                        className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md text-xs font-bold cursor-pointer transition-colors"
+                        title="카톡·문자 안내장 보내기"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-amber-700" />
+                        <span>문자·카톡</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -644,6 +688,16 @@ export function CalendarView({ onSelectDateForNewOrder }: CalendarViewProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 주문 문자 / 카카오톡 전송 모달 */}
+      {sharingOrder && (
+        <OrderShareModal
+          orderData={sharingOrder}
+          isOpen={!!sharingOrder}
+          onClose={() => setSharingOrder(null)}
+          isNewOrder={false}
+        />
       )}
     </div>
   );

@@ -16,8 +16,11 @@ import {
   Calendar,
   CalendarDays,
   Sparkles,
+  Share2,
 } from "lucide-react";
 import { format, addDays, eachDayOfInterval, isSameDay } from "date-fns";
+import { OrderShareModal } from "@/components/OrderShareModal";
+import { OrderCardData } from "@/lib/orderCardCanvas";
 
 interface DashboardViewProps {
   onGoToNewOrder: () => void;
@@ -25,6 +28,7 @@ interface DashboardViewProps {
   onGoToShipments: () => void;
   onGoToCalendar: () => void;
   onRequestConfig: () => void;
+  settings?: any;
 }
 
 export function DashboardView({
@@ -33,6 +37,7 @@ export function DashboardView({
   onGoToShipments,
   onGoToCalendar,
   onRequestConfig,
+  settings,
 }: DashboardViewProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
@@ -40,6 +45,28 @@ export function DashboardView({
     return format(new Date(), "yyyy-MM-dd");
   });
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
+
+  const handleOpenOrderShare = (ord: any) => {
+    const shareData: OrderCardData = {
+      orderNo: ord.order_no || "",
+      customerName: ord.customer_name || "",
+      customerPhone: ord.customer_phone || "",
+      shippingDate: ord.shipping_date || selectedDate,
+      shippingAddress: ord.shipping_address || "",
+      shippingAddressDetail: ord.shipping_address_detail || "",
+      itemsSummary: ord.items_summary || "절임배추",
+      totalAmount: Number(ord.total_amount) || 0,
+      paymentStatus: ord.payment_status || "UNPAID",
+      memo: ord.memo || "",
+      shopName: settings?.shop_name || "임실참배추농원",
+      shopPhone: settings?.shop_phone || settings?.phone || "010-0000-0000",
+      bankName: settings?.bank_name || "농협",
+      bankAccount: settings?.bank_account || "",
+      ownerName: settings?.owner_name || "",
+    };
+    setSharingOrder(shareData);
+  };
 
   // 이번 주 7일간 스케줄러 데이터
   const [weeklySchedule, setWeeklySchedule] = useState<
@@ -337,14 +364,25 @@ export function DashboardView({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => handleMarkPaid(ord.id)}
-                  disabled={updatingId === ord.id}
-                  className="btn-large px-6 bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>{updatingId === ord.id ? "처리 중..." : "입금 완료"}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenOrderShare(ord)}
+                    className="btn-large px-4 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg cursor-pointer flex items-center gap-1.5 font-bold shadow-xs transition-colors"
+                    title="입금 안내 문자/카톡 전송"
+                  >
+                    <Share2 className="w-4 h-4 text-amber-800" />
+                    <span>문자·카톡</span>
+                  </button>
+                  <button
+                    onClick={() => handleMarkPaid(ord.id)}
+                    disabled={updatingId === ord.id}
+                    className="btn-large px-6 bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>{updatingId === ord.id ? "처리 중..." : "입금 완료"}</span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -413,12 +451,32 @@ export function DashboardView({
                       ? "발송완료"
                       : "포장대기"}
                   </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenOrderShare(ord)}
+                    className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-sm font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="문자/카톡 발송"
+                  >
+                    <Share2 className="w-4 h-4 text-amber-700" />
+                    <span>문자·카톡</span>
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* 주문 문자 / 카카오톡 전송 모달 */}
+      {sharingOrder && (
+        <OrderShareModal
+          orderData={sharingOrder}
+          isOpen={!!sharingOrder}
+          onClose={() => setSharingOrder(null)}
+          isNewOrder={false}
+        />
+      )}
     </div>
   );
 }
