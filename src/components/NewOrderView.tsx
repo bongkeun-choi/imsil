@@ -1,14 +1,32 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Plus, Minus, UserCheck } from "lucide-react";
+import {
+  Plus,
+  Minus,
+  UserCheck,
+  Camera,
+  Image as ImageIcon,
+  Sparkles,
+  AlertTriangle,
+  CheckCircle2,
+  History,
+  FileText,
+  RefreshCw,
+} from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
   fetchSettingsService,
   fetchCustomersService,
   createOrderService,
 } from "@/lib/services";
+import { recognizeTextFromImage, OcrProgress } from "@/lib/ocrClient";
+import {
+  analyzeOrderImport,
+  confirmImportedOrder,
+  AnalyzedImportResult,
+} from "@/lib/orderImportService";
 
 interface NewOrderViewProps {
   settings: {
@@ -28,35 +46,43 @@ export function NewOrderView({
   onRequestConfig,
   initialShippingDate,
 }: NewOrderViewProps) {
-  // 고객 정보
+  // 1. 주문서 기본 입력 폼 상태
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
   const [memo, setMemo] = useState("");
+  const [shippingDate, setShippingDate] = useState(() => {
+    return initialShippingDate || format(addDays(new Date(), 1), "yyyy-MM-dd");
+  });
+  const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
 
-  // 기존 고객 자동검색 결과
-  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
-
-  // 상품 단가 및 수량
+  // 2. 상품 및 수량 상태
   const [products, setProducts] = useState<any[]>([]);
   const [qty10kg, setQty10kg] = useState(0);
   const [qty20kg, setQty20kg] = useState(1); // 기본 20kg 1박스
 
-  // 출고일 (달력에서 선택한 날짜가 있으면 우선 반영)
-  const [shippingDate, setShippingDate] = useState(() => {
-    return initialShippingDate || format(addDays(new Date(), 1), "yyyy-MM-dd");
-  });
+  // 3. 기존 고객 자동 검색 결과 (직접 번호 타이핑 시)
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
+
+  // 4. 스마트 문자/사진 자동 가져오기 상태
+  const [smsText, setSmsText] = useState("");
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState<OcrProgress | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalyzedImportResult | null>(null);
+  const [autoFilledNotice, setAutoFilledNotice] = useState(false);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const formTopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (initialShippingDate) {
       setShippingDate(initialShippingDate);
     }
   }, [initialShippingDate]);
-
-  // 입금 상태
-  const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 상품 목록 불러오기
   useEffect(() => {
@@ -73,7 +99,7 @@ export function NewOrderView({
       });
   }, [onRequestConfig]);
 
-  // 전화번호 뒷자리 또는 입력 시 기존 고객 검색
+  // 전화번호 뒷자리 또는 입력 시 기존 고객 자동검색
   useEffect(() => {
     const clean = phone.replace(/[^0-9]/g, "");
     if (clean.length >= 3) {
@@ -95,6 +121,118 @@ export function NewOrderView({
     setCustomerSuggestions([]);
   };
 
+  // --- 스마트 분석 파이프라인 (문자 텍스트 또는 이미지 분석) ---
+  const applyAnalysisToForm = (result: AnalyzedImportResult) => {
+    const p = result.parsed;
+    const cm = result.customer_match;
+
+    if (cm?.name || p.customer_name) {
+      setName(cm?.name || p.customer_name || "");
+    }
+    if (cm?.phone || p.customer_phone) {
+      setPhone(cm?.phone || p.customer_phone || "");
+    }
+    if (p.shipping_address || cm?.address) {
+      setAddress(p.shipping_address || cm?.address || "");
+    }
+    if (cm?.address_detail) {
+      setAddressDetail(cm.address_detail);
+    }
+    if (p.shipping_date) {
+      setShippingDate(p.shipping_date);
+    }
+
+    // 수량 매핑
+    let q10 = 0;
+    let q20 = 0;
+    for (const item of p.items) {
+      if (item.weight_kg === 10) q10 += item.quantity;
+      if (item.weight_kg === 20) q20 += item.quantity;
+    }
+    if (q10 === 0 && q20 === 0) q20 = 1;
+    setQty10kg(q10);
+    setQty20kg(q20);
+
+    if (p.raw_text) {
+      setMemo(p.raw_text);
+    }
+
+    if (p.has_payment_mention) {
+      setPaymentStatus("PAID");
+    }
+
+    setAnalysisResult(result);
+    setAutoFilledNotice(true);
+
+    // 주문서 영역으로 부드럽게 스크롤
+    setTimeout(() => {
+      formTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  };
+
+  const handleAnalyzeSms = async (rawTextToAnalyze?: string) => {
+    const textToRun = rawTextToAnalyze !== undefined ? rawTextToAnalyze : smsText;
+    if (!textToRun.trim()) {
+      alert("분석할 문자 내용을 입력하거나 붙여넣어 주세요.");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setAnalysisProgress({
+      status: "parsing",
+      progress: 40,
+      message: "문자 내용 주문 정보 추출 및 정규화 중...",
+    });
+
+    try {
+      await new Promise((r) => setTimeout(r, 300));
+      const res = await analyzeOrderImport("TEXT_PASTE", textToRun);
+      applyAnalysisToForm(res);
+    } catch (err: any) {
+      alert("문자 분석 중 오류가 발생했습니다: " + err.message);
+    } finally {
+      setIsAnalyzing(false);
+      setAnalysisProgress(null);
+    }
+  };
+
+  const handleImageFile = async (file: File, sourceType: "CAMERA" | "IMAGE_UPLOAD") => {
+    setIsAnalyzing(true);
+    setAnalysisProgress({
+      status: "preprocessing",
+      progress: 20,
+      message: "이미지 대비 및 해상도 최적화 중...",
+    });
+
+    try {
+      const ocrRes = await recognizeTextFromImage(file, (p) => {
+        setAnalysisProgress(p);
+      });
+
+      if (!ocrRes.text.trim()) {
+        throw new Error("이미지에서 텍스트를 찾을 수 없습니다. 선명한 캡처를 선택하거나 문자를 복사해 붙여넣어 주세요.");
+      }
+
+      setSmsText(ocrRes.text);
+      const res = await analyzeOrderImport(sourceType, ocrRes.text);
+      applyAnalysisToForm(res);
+    } catch (err: any) {
+      alert(err.message || "이미지 분석에 실패했습니다.");
+    } finally {
+      setIsAnalyzing(false);
+      setAnalysisProgress(null);
+    }
+  };
+
+  // 과거 주문 배송지 바로 적용
+  const handleApplyPastOrderAddress = () => {
+    if (analysisResult?.customer_match?.last_order?.shipping_address) {
+      setAddress(analysisResult.customer_match.last_order.shipping_address);
+      alert("과거 배송지가 적용되었습니다.");
+    }
+  };
+
+  // 단가 계산
   const product10 = products.find((p) => Number(p.weight_kg) === 10) || {
     id: 1,
     name: "절임배추 10kg",
@@ -111,6 +249,7 @@ export function NewOrderView({
   const totalAmount =
     qty10kg * Number(product10.price) + qty20kg * Number(product20.price);
 
+  // --- 최종 주문 등록 제출 ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -153,16 +292,32 @@ export function NewOrderView({
 
     setIsSubmitting(true);
     try {
-      await createOrderService({
-        name: name.trim(),
-        phone: phone.trim(),
-        address: address.trim(),
-        address_detail: addressDetail.trim(),
-        shipping_date: shippingDate,
-        items,
-        payment_status: paymentStatus,
-        memo: memo.trim(),
-      });
+      if (analysisResult?.import_id) {
+        // 스마트 가져오기로 생성된 경우 원본 매핑 기록과 함께 확정
+        await confirmImportedOrder({
+          import_id: analysisResult.import_id,
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          shipping_address: address.trim(),
+          shipping_address_detail: addressDetail.trim(),
+          shipping_date: shippingDate,
+          items,
+          memo: memo.trim(),
+          is_paid: paymentStatus === "PAID",
+        });
+      } else {
+        // 직접 수기 입력된 경우
+        await createOrderService({
+          name: name.trim(),
+          phone: phone.trim(),
+          address: address.trim(),
+          address_detail: addressDetail.trim(),
+          shipping_date: shippingDate,
+          items,
+          payment_status: paymentStatus,
+          memo: memo.trim(),
+        });
+      }
 
       alert("주문이 성공적으로 등록되었습니다!");
       onOrderSaved();
@@ -174,86 +329,265 @@ export function NewOrderView({
   };
 
   return (
-    <div className="max-w-3xl mx-auto pb-20">
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 md:p-8 shadow-sm">
-        <h1 className="text-2xl md:text-3xl font-black text-slate-900 mb-6 border-b border-slate-200 pb-4">
-          새 주문 입력
-        </h1>
+    <div className="max-w-4xl mx-auto pb-24 space-y-6">
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 1. 상단 스마트 문자·사진 자동 입력 카드 (통합 프레임) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border-2 border-emerald-500 shadow-sm p-5 md:p-7 space-y-4">
+        <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-emerald-300" />
+            </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-black text-slate-900">
+                문자·사진으로 3초 자동 입력
+              </h2>
+              <p className="text-xs md:text-sm text-slate-600">
+                받으신 문자를 붙여넣거나 사진을 올리면, 아래 주문서에 자동으로 입력됩니다.
+              </p>
+            </div>
+          </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 1. 전화번호 및 기존 고객 자동완성 */}
-          <div>
-            <label className="block text-lg md:text-xl font-extrabold text-slate-900 mb-2">
-              전화번호 (뒷자리 또는 전체) <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="예: 010-1234-5678 또는 뒷 4자리"
-              className="w-full text-xl md:text-2xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
-              required
-            />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const sample1 = "전주시 완산구 고사동 303 - 3으로 배추 10키로 2박스 보내주세요 얼마인가요? 010-6615-776 최봉근입니";
+                setSmsText(sample1);
+                handleAnalyzeSms(sample1);
+              }}
+              className="text-xs px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-md font-bold cursor-pointer border border-emerald-200"
+            >
+              예시 1 테스트
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const sample2 = "사장님 작년처럼 20kg 2박스 부탁드려요 홍길동 010-1234-5678 주소는 그대로입니다";
+                setSmsText(sample2);
+                handleAnalyzeSms(sample2);
+              }}
+              className="text-xs px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-md font-bold cursor-pointer border border-amber-200"
+            >
+              예시 2 (작년처럼)
+            </button>
+          </div>
+        </div>
 
-            {customerSuggestions.length > 0 && (
-              <div className="mt-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-3 space-y-2">
-                <div className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
-                  <UserCheck className="w-4 h-4" />
-                  <span>기존 고객이 검색되었습니다. 터치하면 주소가 자동 입력됩니다:</span>
+        {/* 사진 업로드 버튼 2종 */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-sm md:text-base cursor-pointer transition-colors"
+          >
+            <Camera className="w-5 h-5 text-emerald-700" />
+            <span>카메라 촬영</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => galleryInputRef.current?.click()}
+            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-blue-600 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-sm md:text-base cursor-pointer transition-colors"
+          >
+            <ImageIcon className="w-5 h-5 text-blue-700" />
+            <span>문자 캡처 사진</span>
+          </button>
+
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImageFile(file, "CAMERA");
+            }}
+          />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImageFile(file, "IMAGE_UPLOAD");
+            }}
+          />
+        </div>
+
+        {/* 문자 텍스트 붙여넣기 박스 */}
+        <div className="space-y-2">
+          <textarea
+            rows={3}
+            value={smsText}
+            onChange={(e) => setSmsText(e.target.value)}
+            placeholder="문자 내용을 여기에 길게 눌러 [붙여넣기] 하세요...&#10;예: 전주시 완산구 고사동 303-3 배추 10키로 2박스 010-6615-776 최봉근"
+            className="w-full p-3.5 border-2 border-slate-300 rounded-xl text-base text-slate-900 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
+          />
+
+          <button
+            type="button"
+            onClick={() => handleAnalyzeSms()}
+            disabled={isAnalyzing}
+            className="w-full py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-lg font-black flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isAnalyzing ? (
+              <>
+                <RefreshCw className="w-5 h-5 animate-spin" />
+                <span>문자 분석 중 ({analysisProgress?.message || "잠시만 기다려주세요..."})</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5 text-emerald-300" />
+                <span>문자 분석하여 아래 양식에 자동 채우기</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* 분석 완료 시 알림 & 안내 배너 */}
+        {autoFilledNotice && analysisResult && (
+          <div className="space-y-2.5 pt-2">
+            {/* 1. 자동 채움 완료 성공 알림 */}
+            <div className="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl text-emerald-950 flex items-center gap-2 text-sm md:text-base font-bold">
+              <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
+              <span>문자 내용을 분석하여 아래 주문서에 자동 입력했습니다. 확인 후 등록하세요!</span>
+            </div>
+
+            {/* 2. 중복 검사 결과 알림 */}
+            {analysisResult.duplicate_check.decision === "DUPLICATE" ? (
+              <div className="p-3.5 rounded-xl border-2 border-red-500 bg-red-50 text-red-950 flex items-start gap-2.5 text-sm">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-black text-red-700">중복 주문 주의!</span>
+                  <p className="mt-0.5">{analysisResult.duplicate_check.reason}</p>
                 </div>
-                <div className="space-y-1.5">
-                  {customerSuggestions.map((cust) => (
-                    <button
-                      key={cust.id}
-                      type="button"
-                      onClick={() => selectExistingCustomer(cust)}
-                      className="w-full text-left bg-white hover:bg-emerald-100 p-3 rounded-lg border border-emerald-200 cursor-pointer flex justify-between items-center transition-colors"
-                    >
-                      <div>
-                        <span className="text-lg font-bold text-slate-900 mr-3">
-                          {cust.name}
-                        </span>
-                        <span className="text-base text-slate-600">{cust.phone}</span>
-                        <div className="text-sm text-slate-500 truncate">
-                          {cust.address} {cust.address_detail}
-                        </div>
-                      </div>
-                      <span className="bg-emerald-700 text-white text-xs font-bold px-2.5 py-1 rounded-sm">
-                        선택
-                      </span>
-                    </button>
-                  ))}
+              </div>
+            ) : analysisResult.duplicate_check.decision === "POSSIBLE_DUPLICATE" ? (
+              <div className="p-3 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-950 flex items-center gap-2 text-sm">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>확인 필요: {analysisResult.duplicate_check.reason}</span>
+              </div>
+            ) : null}
+
+            {/* 3. 기존 단골 고객 발견 알림 & 과거 배송지 적용 버튼 */}
+            {analysisResult.customer_match && (
+              <div className="p-3.5 rounded-xl border-2 border-blue-400 bg-blue-50 text-blue-950 flex items-center justify-between gap-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-5 h-5 text-blue-700 shrink-0" />
+                  <span>
+                    기존 단골 고객: <strong>{analysisResult.customer_match.name}</strong> ({analysisResult.customer_match.phone})
+                  </span>
                 </div>
+                {analysisResult.customer_match.last_order && (
+                  <button
+                    type="button"
+                    onClick={handleApplyPastOrderAddress}
+                    className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    <span>과거 배송지 적용</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
+        )}
+      </div>
 
-          {/* 2. 고객 이름 */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* 2. 메인 주문 등록 입력 폼 (수기 입력 또는 자동 채움 검토) */}
+      {/* ────────────────────────────────────────────────────────── */}
+      <div ref={formTopRef} className="bg-white rounded-2xl border-2 border-slate-300 p-6 md:p-8 shadow-sm">
+        <div className="border-b border-slate-200 pb-4 mb-6 flex justify-between items-center">
           <div>
-            <label className="block text-lg md:text-xl font-extrabold text-slate-900 mb-2">
-              고객 이름 <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="예: 홍길동"
-              className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3 focus:border-emerald-600 focus:outline-hidden"
-              required
-            />
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900">
+              주문 등록
+            </h1>
+            <p className="text-slate-600 text-sm mt-1">
+              고객 정보와 수량을 확인하시고 아래 [주문 등록 완료] 버튼을 눌러주세요.
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 고객명 & 연락처 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-lg font-bold text-slate-900 mb-1.5">
+                전화번호 <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="예: 010-1234-5678"
+                className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
+                required
+              />
+
+              {/* 기존 고객 자동완성 드롭다운 */}
+              {customerSuggestions.length > 0 && (
+                <div className="mt-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-3 space-y-2">
+                  <div className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4" />
+                    <span>기존 고객 터치 시 자동 입력:</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {customerSuggestions.map((cust) => (
+                      <button
+                        key={cust.id}
+                        type="button"
+                        onClick={() => selectExistingCustomer(cust)}
+                        className="w-full text-left bg-white hover:bg-emerald-100 p-3 rounded-lg border border-emerald-200 cursor-pointer flex justify-between items-center transition-colors"
+                      >
+                        <div>
+                          <span className="text-lg font-bold text-slate-900 mr-2">
+                            {cust.name}
+                          </span>
+                          <span className="text-sm text-slate-600">{cust.phone}</span>
+                          <div className="text-xs text-slate-500 truncate">
+                            {cust.address} {cust.address_detail}
+                          </div>
+                        </div>
+                        <span className="bg-emerald-700 text-white text-xs font-bold px-2.5 py-1 rounded-sm">
+                          선택
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-lg font-bold text-slate-900 mb-1.5">
+                고객 이름 (받는 분) <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 홍길동"
+                className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden"
+                required
+              />
+            </div>
           </div>
 
-          {/* 3. 배송지 주소 */}
+          {/* 배송지 주소 */}
           <div>
-            <label className="block text-lg md:text-xl font-extrabold text-slate-900 mb-2">
+            <label className="block text-lg font-bold text-slate-900 mb-1.5">
               배송 주소 <span className="text-red-600">*</span>
             </label>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="시·군·구·도로명 주소"
-              className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3 mb-2 focus:border-emerald-600 focus:outline-hidden"
+              placeholder="시·군·구·도로명 또는 지번 주소"
+              className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 mb-2 focus:border-emerald-600 focus:outline-hidden"
               required
             />
             <input
@@ -261,23 +595,24 @@ export function NewOrderView({
               value={addressDetail}
               onChange={(e) => setAddressDetail(e.target.value)}
               placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
-              className="w-full text-lg font-medium border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-600 focus:outline-hidden"
+              className="w-full text-base border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-600 focus:outline-hidden"
             />
           </div>
 
-          {/* 4. 포장 단위 및 수량 선택 */}
+          {/* 상품 단위 및 수량 선택 */}
           <div className="border-t border-b border-slate-200 py-6 space-y-4">
-            <h2 className="text-xl md:text-2xl font-black text-slate-900">
-              주문 품목 및 수량
-            </h2>
+            <h3 className="text-xl font-black text-slate-900">
+              주문 품목 및 수량 설정
+            </h3>
 
+            {/* 10kg */}
             <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="text-xl font-black text-slate-900">
                   {product10.name}
                 </div>
-                <div className="text-base font-bold text-slate-600">
-                  단가: {formatPrice(product10.price)}
+                <div className="text-sm font-bold text-slate-600 mt-0.5">
+                  단가: {formatPrice(product10.price)}원
                 </div>
               </div>
 
@@ -285,30 +620,31 @@ export function NewOrderView({
                 <button
                   type="button"
                   onClick={() => setQty10kg((prev) => Math.max(0, prev - 1))}
-                  className="w-14 h-14 bg-white border-2 border-slate-300 rounded-xl text-2xl font-black flex items-center justify-center hover:bg-slate-100 active:scale-95 cursor-pointer"
+                  className="w-13 h-13 bg-white border-2 border-slate-300 rounded-xl text-2xl font-black flex items-center justify-center hover:bg-slate-100 active:scale-95 cursor-pointer"
                 >
                   <Minus className="w-6 h-6" />
                 </button>
-                <span className="text-3xl font-black w-14 text-center stat-number">
+                <span className="text-3xl font-black w-12 text-center stat-number text-slate-900">
                   {qty10kg}
                 </span>
                 <button
                   type="button"
                   onClick={() => setQty10kg((prev) => prev + 1)}
-                  className="w-14 h-14 bg-emerald-600 text-white rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-700 active:scale-95 cursor-pointer"
+                  className="w-13 h-13 bg-emerald-600 text-white rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-700 active:scale-95 cursor-pointer"
                 >
                   <Plus className="w-6 h-6" />
                 </button>
               </div>
             </div>
 
-            <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+            {/* 20kg */}
+            <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
               <div>
-                <div className="text-xl font-black text-slate-900">
+                <div className="text-xl font-black text-emerald-950">
                   {product20.name}
                 </div>
-                <div className="text-base font-bold text-slate-600">
-                  단가: {formatPrice(product20.price)}
+                <div className="text-sm font-bold text-emerald-800 mt-0.5">
+                  단가: {formatPrice(product20.price)}원
                 </div>
               </div>
 
@@ -316,17 +652,17 @@ export function NewOrderView({
                 <button
                   type="button"
                   onClick={() => setQty20kg((prev) => Math.max(0, prev - 1))}
-                  className="w-14 h-14 bg-white border-2 border-slate-300 rounded-xl text-2xl font-black flex items-center justify-center hover:bg-slate-100 active:scale-95 cursor-pointer"
+                  className="w-13 h-13 bg-white border-2 border-emerald-300 rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-100 active:scale-95 cursor-pointer"
                 >
-                  <Minus className="w-6 h-6" />
+                  <Minus className="w-6 h-6 text-emerald-900" />
                 </button>
-                <span className="text-3xl font-black w-14 text-center stat-number">
+                <span className="text-3xl font-black w-12 text-center stat-number text-emerald-950">
                   {qty20kg}
                 </span>
                 <button
                   type="button"
                   onClick={() => setQty20kg((prev) => prev + 1)}
-                  className="w-14 h-14 bg-emerald-600 text-white rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-700 active:scale-95 cursor-pointer"
+                  className="w-13 h-13 bg-emerald-700 text-white rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer"
                 >
                   <Plus className="w-6 h-6" />
                 </button>
@@ -334,10 +670,10 @@ export function NewOrderView({
             </div>
           </div>
 
-          {/* 5. 출고 희망일 선택 */}
+          {/* 출고 희망일 선택 */}
           <div>
-            <label className="block text-lg md:text-xl font-extrabold text-slate-900 mb-2">
-              출고 예정일 <span className="text-red-600">*</span>
+            <label className="block text-lg font-bold text-slate-900 mb-1.5">
+              출고 예정일 (택배 발송일) <span className="text-red-600">*</span>
             </label>
             <input
               type="date"
@@ -348,19 +684,19 @@ export function NewOrderView({
             />
           </div>
 
-          {/* 6. 입금 상태 선택 */}
+          {/* 입금 상태 선택 */}
           <div>
-            <label className="block text-lg md:text-xl font-extrabold text-slate-900 mb-2">
+            <label className="block text-lg font-bold text-slate-900 mb-1.5">
               입금 여부
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setPaymentStatus("UNPAID")}
-                className={`btn-large rounded-xl border-2 cursor-pointer transition-all ${
+                className={`py-3.5 rounded-xl border-2 cursor-pointer transition-all text-lg ${
                   paymentStatus === "UNPAID"
                     ? "bg-red-50 border-red-500 text-red-900 font-black shadow-xs"
-                    : "bg-white border-slate-300 text-slate-700"
+                    : "bg-white border-slate-300 text-slate-700 font-bold"
                 }`}
               >
                 미입금 (입금 대기)
@@ -368,10 +704,10 @@ export function NewOrderView({
               <button
                 type="button"
                 onClick={() => setPaymentStatus("PAID")}
-                className={`btn-large rounded-xl border-2 cursor-pointer transition-all ${
+                className={`py-3.5 rounded-xl border-2 cursor-pointer transition-all text-lg ${
                   paymentStatus === "PAID"
                     ? "bg-blue-50 border-blue-600 text-blue-900 font-black shadow-xs"
-                    : "bg-white border-slate-300 text-slate-700"
+                    : "bg-white border-slate-300 text-slate-700 font-bold"
                 }`}
               >
                 입금 완료 (확인됨)
@@ -379,13 +715,13 @@ export function NewOrderView({
             </div>
           </div>
 
-          {/* 7. 배송 메모 */}
+          {/* 배송 및 원본 메모 */}
           <div>
-            <label className="block text-lg font-bold text-slate-800 mb-2">
-              배송 및 고객 요청사항 (선택)
+            <label className="block text-base font-bold text-slate-800 mb-1.5">
+              배송 메모 및 원본 내용 (선택)
             </label>
-            <input
-              type="text"
+            <textarea
+              rows={2}
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               placeholder="예: 문 앞에 놓아주세요 / 오후 배송 요망"
@@ -393,26 +729,27 @@ export function NewOrderView({
             />
           </div>
 
-          {/* 8. 총 금액 요약 */}
+          {/* 총 금액 요약 */}
           <div className="bg-slate-900 text-white rounded-2xl p-6">
             <div className="flex justify-between items-center text-xl font-bold mb-2">
               <span>총 주문 금액:</span>
               <span className="text-3xl md:text-4xl font-black text-amber-400 stat-number">
-                {formatPrice(totalAmount)}
+                {formatPrice(totalAmount)}원
               </span>
             </div>
-            <div className="text-sm text-slate-300 border-t border-slate-800 pt-3 mt-3">
+            <div className="text-xs md:text-sm text-slate-300 border-t border-slate-800 pt-3 mt-3">
               입금 안내 계좌: {settings.bank_name || "농협"} {settings.bank_account || "351-0000-0000-00"} ({settings.owner_name || "대표자"})
             </div>
           </div>
 
-          {/* 9. 저장 버튼 */}
+          {/* 최종 주문 등록 완료 버튼 */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full btn-large bg-emerald-600 hover:bg-emerald-700 text-white text-2xl font-black py-4 rounded-xl shadow-md cursor-pointer transition-colors"
+            className="w-full py-4.5 bg-emerald-700 hover:bg-emerald-800 text-white text-2xl font-black rounded-xl shadow-md cursor-pointer transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {isSubmitting ? "주문 저장 중..." : "주문 저장하기"}
+            <CheckCircle2 className="w-7 h-7" />
+            <span>{isSubmitting ? "주문 등록 중..." : "확인 완료 및 주문 등록"}</span>
           </button>
         </form>
       </div>

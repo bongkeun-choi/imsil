@@ -8,14 +8,12 @@ import { NewOrderView } from "@/components/NewOrderView";
 import { ShipmentView } from "@/components/ShipmentView";
 import { CustomerView } from "@/components/CustomerView";
 import { SettingsView } from "@/components/SettingsView";
-import { SmartOrderImportView } from "@/components/SmartOrderImportView";
 import { fetchSettingsService } from "@/lib/services";
 import { initClientTables, getClientDb } from "@/lib/clientDb";
 
 const VALID_TABS = [
   "dashboard",
   "calendar",
-  "smart-import",
   "new-order",
   "shipments",
   "customers",
@@ -143,29 +141,20 @@ export default function Home() {
               setOrderTargetDate(undefined);
               handleTabChange("new-order");
             }}
-            onGoToSmartImport={() => handleTabChange("smart-import")}
             onGoToShipments={() => handleTabChange("shipments")}
             onGoToCalendar={() => handleTabChange("calendar")}
             onRequestConfig={() => {}}
           />
         )}
 
-        {/* 2. [신규] 월별·주간별 출고 달력 스케줄러 */}
+        {/* 2. 월별·주간별 출고 달력 스케줄러 */}
         {activeTab === "calendar" && (
           <CalendarView
             onSelectDateForNewOrder={handleSelectDateForNewOrder}
           />
         )}
 
-        {/* 3. [신규] 문자 주문 스마트 가져오기 (OCR & 파서) */}
-        {activeTab === "smart-import" && (
-          <SmartOrderImportView
-            onOrderCreated={() => handleTabChange("dashboard")}
-            onNavigateTab={handleTabChange}
-          />
-        )}
-
-        {/* 4. 새 주문 직접 등록 */}
+        {/* 3. 통합 주문 등록 (문자·사진 자동 입력 및 수기 등록) */}
         {activeTab === "new-order" && (
           <NewOrderView
             settings={settings}

@@ -148,21 +148,12 @@ export function DashboardView({
           >
             <RefreshCw className="w-5 h-5" />
           </button>
-          {onGoToSmartImport && (
-            <button
-              onClick={onGoToSmartImport}
-              className="btn-large px-4 md:px-5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg cursor-pointer flex items-center gap-2 shadow-xs transition-colors"
-            >
-              <Sparkles className="w-5 h-5 text-emerald-300" />
-              <span className="font-bold">문자 주문 가져오기</span>
-            </button>
-          )}
           <button
             onClick={onGoToNewOrder}
-            className="btn-large px-5 md:px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg cursor-pointer flex items-center gap-2 shadow-xs transition-colors"
+            className="btn-large px-6 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg cursor-pointer flex items-center gap-2 shadow-xs transition-colors"
           >
             <span className="text-xl font-black">+</span>
-            <span className="font-bold">새 주문 등록</span>
+            <span className="font-bold text-lg">주문 등록</span>
           </button>
         </div>
       </div>
