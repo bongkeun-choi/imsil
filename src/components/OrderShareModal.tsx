@@ -60,7 +60,7 @@ export function OrderShareModal({
   onClose,
   isNewOrder = false,
 }: OrderShareModalProps) {
-  const [activeTab, setActiveTab] = useState<"text" | "image">("text");
+  const [activeTab, setActiveTab] = useState<"image" | "text">("image");
   const [messageText, setMessageText] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -90,26 +90,31 @@ export function OrderShareModal({
   // 스마트폰 뒤로 가기 제스처 연동
   useEffect(() => {
     if (!isOpen) return;
-    window.history.pushState({ modal: "order-share" }, "");
+
+    let closedByPop = false;
+    const currentState = window.history.state;
+    if (currentState?.modal !== "order-share") {
+      window.history.pushState({ ...currentState, modal: "order-share" }, "");
+    }
 
     const handlePopState = () => {
+      closedByPop = true;
       onClose();
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => {
       window.removeEventListener("popstate", handlePopState);
+      if (!closedByPop && window.history.state?.modal === "order-share") {
+        window.history.back();
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleClose = () => {
-    if (window.history.state?.modal === "order-share") {
-      window.history.back();
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   // 1. 스마트폰 네이티브 공유 (카카오톡, 문자, 밴드 등 선택)
@@ -197,14 +202,34 @@ export function OrderShareModal({
     if (!imageDataUrl) return;
     const a = document.createElement("a");
     a.href = imageDataUrl;
-    a.download = `주문확인서_${orderData.customerName}_${orderData.orderNo}.png`;
+    a.download = `장모님절임배추_주문확인서_${orderData.customerName}_${orderData.orderNo}.png`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
 
+  // 6. 영수증 이미지 클립보드 직접 복사 (Ctrl+V용)
+  const handleCopyImage = async () => {
+    if (!imageFile) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && (window as any).ClipboardItem) {
+        await navigator.clipboard.write([
+          new (window as any).ClipboardItem({
+            "image/png": imageFile,
+          }),
+        ]);
+        alert("장모님 주문 카드가 복사되었습니다!\n카카오톡 대화창에서 Ctrl+V (붙여넣기) 하시면 바로 전송됩니다.");
+      } else {
+        handleDownloadImage();
+      }
+    } catch (e) {
+      console.warn("ClipboardItem write failed, fallback download:", e);
+      handleDownloadImage();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-3 backdrop-blur-xs">
+    <div className="fixed inset-0 z-[80] bg-black/70 flex items-center justify-center p-3 backdrop-blur-xs">
       <div className="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border-4 border-emerald-600 animate-in fade-in zoom-in duration-150">
         {/* 모달 상단 헤더 */}
         <div className="bg-emerald-700 text-white p-4 md:p-5 rounded-t-[20px] flex items-center justify-between">
@@ -217,7 +242,7 @@ export function OrderShareModal({
                 {isNewOrder ? "주문 등록 완료 및 안내 전송" : "주문 확인 안내 전송"}
               </h3>
               <p className="text-xs text-emerald-200">
-                고객에게 카카오톡이나 문자로 주문 확인서와 계좌를 전송합니다.
+                장모님 절임배추 정품 주문 카드 또는 텍스트 문구를 고객에게 전송합니다.
               </p>
             </div>
           </div>
@@ -230,21 +255,8 @@ export function OrderShareModal({
           </button>
         </div>
 
-        {/* 탭 전환 (문구 보기 / 영수증 이미지 카드) */}
+        {/* 탭 전환 (영수증 이미지 카드 / 문구 보기) */}
         <div className="flex border-b-2 border-slate-200 bg-slate-50 px-4 pt-3 gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab("text")}
-            className={`flex-1 py-2.5 px-3 rounded-t-xl font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-              activeTab === "text"
-                ? "bg-white text-emerald-800 border-t-2 border-x-2 border-slate-200 border-b-white -mb-[2px]"
-                : "text-slate-600 hover:text-slate-900"
-            }`}
-          >
-            <FileText className="w-4 h-4 text-emerald-600" />
-            <span>문자 / 카톡 문구</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setActiveTab("image")}
@@ -255,7 +267,20 @@ export function OrderShareModal({
             }`}
           >
             <ImageIcon className="w-4 h-4 text-emerald-600" />
-            <span>영수증 사진 카드</span>
+            <span>🖼️ 장모님 주문 카드</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("text")}
+            className={`flex-1 py-2.5 px-3 rounded-t-xl font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+              activeTab === "text"
+                ? "bg-white text-emerald-800 border-t-2 border-x-2 border-slate-200 border-b-white -mb-[2px]"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>💬 문자 / 카톡 문구</span>
           </button>
         </div>
 
@@ -298,14 +323,26 @@ export function OrderShareModal({
                   자동 생성된 주문 영수증 이미지
                 </span>
                 {imageDataUrl && (
-                  <button
-                    type="button"
-                    onClick={handleDownloadImage}
-                    className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>사진 저장</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleCopyImage}
+                      className="text-xs font-bold text-emerald-800 hover:text-emerald-900 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-300 cursor-pointer"
+                      title="클립보드에 이미지 복사 (카톡에 Ctrl+V 붙여넣기)"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>이미지 복사</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadImage}
+                      className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 cursor-pointer"
+                      title="사진 파일로 저장"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>사진 저장</span>
+                    </button>
+                  </div>
                 )}
               </div>
 
