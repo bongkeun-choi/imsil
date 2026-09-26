@@ -1,2 +1,2 @@
 :HL["/imsil/_next/static/chunks/0026uhv55mdh0.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}},"staleTime":300,"buildId":"myuhzsr2AlI-5utZk-efF"}
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}},"staleTime":300,"buildId":"2jl87gnEG1NneIZsQ8Vxi"}
