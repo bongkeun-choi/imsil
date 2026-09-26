@@ -58,15 +58,15 @@ export function NewOrderView({
   const [address, setAddress] = useState("");
   const [addressDetail, setAddressDetail] = useState("");
   const [memo, setMemo] = useState("");
+  // 기본 택배 도착 희망일은 영업일 고려 2일 뒤
   const [shippingDate, setShippingDate] = useState(() => {
-    return initialShippingDate || format(addDays(new Date(), 1), "yyyy-MM-dd");
+    return initialShippingDate || format(addDays(new Date(), 2), "yyyy-MM-dd");
   });
   const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
   const [createdOrderShareData, setCreatedOrderShareData] = useState<OrderCardData | null>(null);
 
-  // 2. 상품 및 수량 상태
+  // 2. 상품 및 수량 상태 (현재 판매 상품: 절임배추 20kg 단일 규격)
   const [products, setProducts] = useState<any[]>([]);
-  const [qty10kg, setQty10kg] = useState(0);
   const [qty20kg, setQty20kg] = useState(1); // 기본 20kg 1박스
 
   // 3. 기존 고객 자동 검색 결과 (직접 번호 타이핑 시)
@@ -170,16 +170,13 @@ export function NewOrderView({
       setShippingDate(p.shipping_date);
     }
 
-    // 수량 매핑
-    let q10 = 0;
-    let q20 = 0;
+    // 수량 매핑 (현재 판매 규격인 20kg로 우선 매핑)
+    let totalBoxes = 0;
     for (const item of p.items) {
-      if (item.weight_kg === 10) q10 += item.quantity;
-      if (item.weight_kg === 20) q20 += item.quantity;
+      totalBoxes += item.quantity;
     }
-    if (q10 === 0 && q20 === 0) q20 = 1;
-    setQty10kg(q10);
-    setQty20kg(q20);
+    if (totalBoxes === 0) totalBoxes = 1;
+    setQty20kg(totalBoxes);
 
     if (p.raw_text) {
       setMemo(p.raw_text);
@@ -260,13 +257,20 @@ export function NewOrderView({
     }
   };
 
-  // 단가 계산
-  const product10 = products.find((p) => Number(p.weight_kg) === 10) || {
-    id: 1,
-    name: "절임배추 10kg",
-    price: 38000,
-    weight_kg: 10,
+  // 발송일 계산 헬퍼 (도착일 기준 D-1)
+  const getDispatchDateInfo = (arrivalDateStr: string) => {
+    if (!arrivalDateStr) return "";
+    try {
+      const arr = new Date(arrivalDateStr + "T00:00:00");
+      if (isNaN(arr.getTime())) return "";
+      const disp = addDays(arr, -1);
+      return format(disp, "yyyy년 MM월 dd일 (EEE)");
+    } catch {
+      return "";
+    }
   };
+
+  // 단가 계산 (현재 20kg 단일 규격 중심)
   const product20 = products.find((p) => Number(p.weight_kg) === 20) || {
     id: 2,
     name: "절임배추 20kg",
@@ -274,8 +278,7 @@ export function NewOrderView({
     weight_kg: 20,
   };
 
-  const totalAmount =
-    qty10kg * Number(product10.price) + qty20kg * Number(product20.price);
+  const totalAmount = qty20kg * Number(product20.price);
 
   // --- 최종 주문 등록 제출 ---
   const handleSubmit = async (e: React.FormEvent) => {
@@ -293,30 +296,20 @@ export function NewOrderView({
       alert("배송지 주소를 입력해 주세요.");
       return;
     }
-    if (qty10kg === 0 && qty20kg === 0) {
-      alert("10kg 또는 20kg 수량을 1개 이상 선택해 주세요.");
+    if (qty20kg < 1) {
+      alert("절임배추 20kg 수량을 1박스 이상 선택해 주세요.");
       return;
     }
 
-    const items = [];
-    if (qty10kg > 0) {
-      items.push({
-        product_id: product10.id,
-        product_name: product10.name,
-        quantity: qty10kg,
-        unit_price: product10.price,
-        weight_kg: 10,
-      });
-    }
-    if (qty20kg > 0) {
-      items.push({
+    const items = [
+      {
         product_id: product20.id,
         product_name: product20.name,
         quantity: qty20kg,
         unit_price: product20.price,
         weight_kg: 20,
-      });
-    }
+      },
+    ];
 
     setIsSubmitting(true);
     try {
@@ -667,89 +660,102 @@ export function NewOrderView({
             />
           </div>
 
-          {/* 상품 단위 및 수량 선택 */}
+          {/* 상품 단위 및 수량 선택 (절임배추 20kg 단일 규격) */}
           <div className="border-t border-b border-slate-200 py-6 space-y-4">
-            <h3 className="text-xl font-black text-slate-900">
-              주문 품목 및 수량 설정
-            </h3>
-
-            {/* 10kg */}
-            <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="text-xl font-black text-slate-900">
-                  {product10.name}
-                </div>
-                <div className="text-sm font-bold text-slate-600 mt-0.5">
-                  단가: {formatPrice(product10.price)}원
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setQty10kg((prev) => Math.max(0, prev - 1))}
-                  className="w-13 h-13 bg-white border-2 border-slate-300 rounded-xl text-2xl font-black flex items-center justify-center hover:bg-slate-100 active:scale-95 cursor-pointer"
-                >
-                  <Minus className="w-6 h-6" />
-                </button>
-                <span className="text-3xl font-black w-12 text-center stat-number text-slate-900">
-                  {qty10kg}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQty10kg((prev) => prev + 1)}
-                  className="w-13 h-13 bg-emerald-600 text-white rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-700 active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-6 h-6" />
-                </button>
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-black text-slate-900">
+                주문 상품 및 수량
+              </h3>
+              <span className="text-xs md:text-sm font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                현재 판매 품목: 절임배추 20kg
+              </span>
             </div>
 
-            {/* 20kg */}
-            <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <div className="text-xl font-black text-emerald-950">
-                  {product20.name}
+            {/* 20kg 메인 카드 */}
+            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-2xl font-black text-emerald-950 flex items-center gap-2">
+                    <span>{product20.name}</span>
+                    <span className="text-sm font-bold bg-emerald-700 text-white px-2 py-0.5 rounded-md">
+                      기본 1박스
+                    </span>
+                  </div>
+                  <div className="text-base font-bold text-emerald-800 mt-1">
+                    단가: <span className="stat-number">{formatPrice(product20.price)}</span>원 / 1박스
+                  </div>
                 </div>
-                <div className="text-sm font-bold text-emerald-800 mt-0.5">
-                  단가: {formatPrice(product20.price)}원
+
+                {/* 대형 수량 조절 버튼 */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setQty20kg((prev) => Math.max(1, prev - 1))}
+                    className="w-14 h-14 bg-white border-2 border-emerald-400 rounded-2xl text-2xl font-black flex items-center justify-center hover:bg-emerald-100 active:scale-95 cursor-pointer shadow-xs"
+                  >
+                    <Minus className="w-7 h-7 text-emerald-900" />
+                  </button>
+                  <span className="text-4xl font-black w-14 text-center stat-number text-emerald-950">
+                    {qty20kg}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQty20kg((prev) => prev + 1)}
+                    className="w-14 h-14 bg-emerald-700 text-white rounded-2xl text-2xl font-black flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer shadow-md"
+                  >
+                    <Plus className="w-7 h-7" />
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setQty20kg((prev) => Math.max(0, prev - 1))}
-                  className="w-13 h-13 bg-white border-2 border-emerald-300 rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-100 active:scale-95 cursor-pointer"
-                >
-                  <Minus className="w-6 h-6 text-emerald-900" />
-                </button>
-                <span className="text-3xl font-black w-12 text-center stat-number text-emerald-950">
-                  {qty20kg}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setQty20kg((prev) => prev + 1)}
-                  className="w-13 h-13 bg-emerald-700 text-white rounded-xl text-2xl font-black flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer"
-                >
-                  <Plus className="w-6 h-6" />
-                </button>
+              {/* 빠른 박스 수량 선택 버튼 모음 */}
+              <div className="pt-2 border-t border-emerald-200/80 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-emerald-900 mr-1">빠른 선택:</span>
+                {[1, 2, 3, 5, 10].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setQty20kg(num)}
+                    className={`px-3.5 py-1.5 rounded-xl font-extrabold text-sm border cursor-pointer transition-all ${
+                      qty20kg === num
+                        ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
+                        : "bg-white text-emerald-900 border-emerald-300 hover:bg-emerald-100"
+                    }`}
+                  >
+                    {num}박스 ({num * 20}kg)
+                  </button>
+                ))}
               </div>
             </div>
           </div>
 
-          {/* 출고 희망일 선택 */}
-          <div>
-            <label className="block text-lg font-bold text-slate-900 mb-1.5">
-              출고 예정일 (택배 발송일) <span className="text-red-600">*</span>
-            </label>
+          {/* 택배 도착 희망일 (배추 받는 날) 선택 */}
+          <div className="bg-emerald-50/60 border-2 border-emerald-400 rounded-2xl p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <label className="text-xl font-black text-slate-900 flex items-center gap-1.5">
+                <span>택배 도착 희망일 (배추 받는 날)</span>
+                <span className="text-red-600">*</span>
+              </label>
+              <span className="text-xs md:text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-md">
+                김장 전날 수령 기준
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-slate-600">
+              고객이 김치 담그기 전날 수령할 날짜를 선택합니다. (농가 발송·포장은 도착 전날 진행됩니다)
+            </p>
             <input
               type="date"
               value={shippingDate}
               onChange={(e) => setShippingDate(e.target.value)}
-              className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
+              className="w-full text-2xl font-black border-2 border-emerald-500 rounded-xl px-4 py-3.5 focus:border-emerald-700 focus:outline-hidden bg-white"
               required
             />
+            <div className="p-3 bg-white border border-emerald-300 rounded-xl flex flex-wrap items-center justify-between text-sm md:text-base font-bold text-slate-800 shadow-xs gap-2">
+              <span className="text-slate-600">🚚 농가 택배 발송 예정일:</span>
+              <span className="text-emerald-800 font-black text-base md:text-lg">
+                {getDispatchDateInfo(shippingDate)} (도착 전날 D-1)
+              </span>
+            </div>
           </div>
 
           {/* 입금 상태 선택 */}

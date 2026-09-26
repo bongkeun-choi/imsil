@@ -140,9 +140,9 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
       {/* 1. 상단 컨트롤 바 */}
       <div className="bg-white p-5 rounded-2xl border-2 border-slate-300 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <span className="text-xl md:text-2xl font-black text-slate-900">
-            출고일자:
+            택배 도착일자:
           </span>
           <input
             type="date"
@@ -164,17 +164,22 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
           className="btn-large px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-xl cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
         >
           <Download className="w-5 h-5 text-emerald-400" />
-          <span>택배용 엑셀(CSV) 다운로드</span>
+          <span>우체국 택배용 CSV 다운로드</span>
         </button>
       </div>
 
-      {/* 2. 출고 명단 목록 */}
+      {/* 2. 발송 명단 목록 */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm">
-        <div className="border-b border-slate-200 pb-3 mb-4 flex justify-between items-center">
-          <h2 className="text-2xl md:text-3xl font-black text-slate-900">
-            {selectedDate} 출고 명단 ({orders.length}건)
-          </h2>
-          <span className="text-base text-slate-600 font-medium">
+        <div className="border-b border-slate-200 pb-3 mb-4 flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900">
+              {selectedDate} 도착 대상 발송 명단 ({orders.length}건)
+            </h2>
+            <p className="text-xs md:text-sm font-bold text-emerald-800 mt-0.5">
+              도착일 전날 포장하여 우체국택배로 전달합니다.
+            </p>
+          </div>
+          <span className="text-sm md:text-base text-slate-600 font-semibold">
             박스 포장 후 체크 버튼을 누르면 포장완료 처리됩니다.
           </span>
         </div>

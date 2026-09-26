@@ -89,7 +89,7 @@ export async function generateOrderCardImage(
 
   ctx.fillStyle = "#334155";
   ctx.font = "bold 18px -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif";
-  ctx.fillText(`출고 예정일: ${data.shippingDate}`, 65, currentY + 115);
+  ctx.fillText(`택배 도착일: ${data.shippingDate} (도착 전날 발송)`, 65, currentY + 115);
 
   const fullAddr = `${data.shippingAddress} ${data.shippingAddressDetail || ""}`.trim();
   ctx.fillStyle = "#475569";

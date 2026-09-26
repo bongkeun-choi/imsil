@@ -26,7 +26,7 @@ export function generateOrderShareMessage(data: OrderCardData): string {
   msg += `■ 주문 접수 내역\n`;
   msg += `• 주문번호: ${data.orderNo}\n`;
   msg += `• 주문상품: ${data.itemsSummary}\n`;
-  msg += `• 출고예정일: ${data.shippingDate}\n`;
+  msg += `• 택배 도착 예정일: ${data.shippingDate} (도착 전날 신선 포장 발송)\n`;
   msg += `• 받으실 주소: ${fullAddress}\n\n`;
 
   msg += `■ 결제 및 입금 안내\n`;

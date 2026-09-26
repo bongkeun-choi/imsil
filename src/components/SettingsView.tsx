@@ -198,47 +198,37 @@ export function SettingsView({
             </div>
           </div>
 
-          {/* 절임배추 단가 설정 */}
+          {/* 판매 상품 단가 설정 */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-5 space-y-4">
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Tag className="w-5 h-5 text-blue-700" />
-              <span>절임배추 상자별 판매 가격</span>
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Tag className="w-5 h-5 text-emerald-700" />
+                <span>판매 상품 단가 설정</span>
+              </h2>
+              <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md">
+                현재 판매 품목: 절임배추 20kg 단일 규격
+              </span>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-white p-4 rounded-xl border border-slate-300">
-                <label className="block text-lg font-black text-slate-900 mb-2">
-                  절임배추 10kg 단가 (원)
-                </label>
-                <input
-                  type="number"
-                  value={price10kg}
-                  onChange={(e) => setPrice10kg(Number(e.target.value))}
-                  step="1000"
-                  className="w-full text-2xl font-black border-2 border-slate-300 rounded-lg px-4 py-3 stat-number"
-                  required
-                />
-                <div className="text-sm font-semibold text-slate-500 mt-1">
-                  현재 설정: {formatPrice(price10kg)}
-                </div>
+            <div className="bg-emerald-50/80 p-5 rounded-2xl border-2 border-emerald-400 space-y-2">
+              <label className="block text-xl font-black text-emerald-950 mb-1">
+                절임배추 20kg (1박스) 판매 단가 (원) <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="number"
+                value={price20kg}
+                onChange={(e) => setPrice20kg(Number(e.target.value))}
+                step="1000"
+                className="w-full text-3xl font-black border-2 border-emerald-500 rounded-xl px-4 py-3 stat-number bg-white text-emerald-950 focus:border-emerald-700 focus:outline-hidden"
+                required
+              />
+              <div className="text-sm font-black text-emerald-800">
+                현재 주문서 적용 단가: {formatPrice(price20kg)}원
               </div>
+            </div>
 
-              <div className="bg-white p-4 rounded-xl border border-slate-300">
-                <label className="block text-lg font-black text-slate-900 mb-2">
-                  절임배추 20kg 단가 (원)
-                </label>
-                <input
-                  type="number"
-                  value={price20kg}
-                  onChange={(e) => setPrice20kg(Number(e.target.value))}
-                  step="1000"
-                  className="w-full text-2xl font-black border-2 border-slate-300 rounded-lg px-4 py-3 stat-number"
-                  required
-                />
-                <div className="text-sm font-semibold text-slate-500 mt-1">
-                  현재 설정: {formatPrice(price20kg)}
-                </div>
-              </div>
+            <div className="bg-slate-100 p-4 rounded-xl border border-slate-300 text-xs md:text-sm text-slate-600 font-medium leading-relaxed">
+              💡 <strong>상품 확장 안내:</strong> 현재는 <strong>절임배추 20kg</strong> 단일 규격으로만 주문 접수됩니다. 추후 알타리김치, 갓김치, 고춧가루 또는 10kg 포장 등 추가 품목 판매 시 관리자 설정에서 즉시 확장할 수 있도록 시스템이 구축되어 있습니다.
             </div>
           </div>
 

@@ -187,35 +187,40 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
     <div className="max-w-6xl mx-auto space-y-6 pb-20">
       {/* 1. 상단 컨트롤 바 */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <CalendarIcon className="w-7 h-7 text-emerald-700" />
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900">
-            {format(currentDate, "yyyy년 M월")}
-            {viewMode === "week" && ` (주간 일정)`}
-          </h1>
+        <div>
+          <div className="flex items-center gap-3">
+            <CalendarIcon className="w-7 h-7 text-emerald-700" />
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900">
+              {format(currentDate, "yyyy년 M월")} 택배 도착 달력
+              {viewMode === "week" && ` (주간)`}
+            </h1>
 
-          <div className="flex items-center gap-1 border border-slate-300 rounded-lg p-1 bg-slate-50">
-            <button
-              onClick={handlePrev}
-              className="p-2 hover:bg-slate-200 rounded-md cursor-pointer"
-              title="이전"
-            >
-              <ChevronLeft className="w-5 h-5 text-slate-700" />
-            </button>
-            <button
-              onClick={handleToday}
-              className="px-3 py-1 font-bold text-sm text-slate-800 hover:bg-slate-200 rounded-md cursor-pointer"
-            >
-              오늘
-            </button>
-            <button
-              onClick={handleNext}
-              className="p-2 hover:bg-slate-200 rounded-md cursor-pointer"
-              title="다음"
-            >
-              <ChevronRight className="w-5 h-5 text-slate-700" />
-            </button>
+            <div className="flex items-center gap-1 border border-slate-300 rounded-lg p-1 bg-slate-50">
+              <button
+                onClick={handlePrev}
+                className="p-2 hover:bg-slate-200 rounded-md cursor-pointer"
+                title="이전"
+              >
+                <ChevronLeft className="w-5 h-5 text-slate-700" />
+              </button>
+              <button
+                onClick={handleToday}
+                className="px-3 py-1 font-bold text-sm text-slate-800 hover:bg-slate-200 rounded-md cursor-pointer"
+              >
+                오늘
+              </button>
+              <button
+                onClick={handleNext}
+                className="p-2 hover:bg-slate-200 rounded-md cursor-pointer"
+                title="다음"
+              >
+                <ChevronRight className="w-5 h-5 text-slate-700" />
+              </button>
+            </div>
           </div>
+          <p className="text-xs md:text-sm font-bold text-emerald-800 mt-1">
+            고객 배추 수령(도착) 기준 일정입니다. (농가 발송·포장은 도착 전날 D-1 진행)
+          </p>
         </div>
 
         {/* 월간 / 주간 보기 전환 탭 */}
@@ -307,23 +312,29 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                     )}
                   </div>
 
-                  {/* 물량 요약 (10kg / 20kg) */}
+                  {/* 물량 요약 (20kg 중심) */}
                   {hasOrders ? (
                     <div className="space-y-0.5 md:space-y-1 my-0.5 md:my-1 text-[10px] sm:text-xs md:text-sm font-black leading-tight">
-                      {summary.qty10kg > 0 && (
+                      {summary.qty20kg > 0 ? (
                         <div className="bg-emerald-100 text-emerald-900 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate">
-                          10k: {summary.qty10kg}개
+                          20k: {summary.qty20kg}박스
+                        </div>
+                      ) : summary.qty10kg > 0 ? (
+                        <div className="bg-slate-100 text-slate-800 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate">
+                          {summary.totalWeight}kg
+                        </div>
+                      ) : (
+                        <div className="bg-emerald-100 text-emerald-900 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate">
+                          도착 {summary.orderCount}건
                         </div>
                       )}
-                      {summary.qty20kg > 0 && (
-                        <div className="bg-blue-100 text-blue-900 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate">
-                          20k: {summary.qty20kg}개
-                        </div>
-                      )}
+                      <div className="text-[9px] md:text-[11px] text-slate-500 font-bold hidden sm:block">
+                        (발송: D-1)
+                      </div>
                     </div>
                   ) : (
                     <div className="text-[10px] md:text-xs text-slate-300 font-medium py-1 hidden sm:block">
-                      출고없음
+                      도착없음
                     </div>
                   )}
 
@@ -388,21 +399,20 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                     <div className="space-y-2 mb-4">
                       <div className="text-center py-2 bg-emerald-100 rounded-xl">
                         <div className="text-xs text-emerald-800 font-bold">
-                          총 출고 건수
+                          택배 도착 건수
                         </div>
                         <div className="text-2xl font-black text-emerald-950">
                           {summary.orderCount}건
                         </div>
+                        <div className="text-[11px] text-emerald-700 font-bold">
+                          (발송일: 전날 D-1)
+                        </div>
                       </div>
 
                       <div className="text-sm font-black space-y-1">
-                        <div className="flex justify-between text-emerald-800">
-                          <span>10kg:</span>
-                          <span>{summary.qty10kg}개</span>
-                        </div>
-                        <div className="flex justify-between text-blue-800">
-                          <span>20kg:</span>
-                          <span>{summary.qty20kg}개</span>
+                        <div className="flex justify-between text-emerald-900">
+                          <span>절임배추 20kg:</span>
+                          <span>{summary.qty20kg}박스</span>
                         </div>
                         <div className="flex justify-between text-slate-900 border-t border-slate-200 pt-1">
                           <span>총 중량:</span>
@@ -426,7 +436,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                     </div>
                   ) : (
                     <div className="py-12 text-center text-slate-400 text-sm font-semibold">
-                      출고 일정 없음
+                      도착 일정 없음
                     </div>
                   )}
                 </div>
@@ -447,17 +457,15 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
         </div>
       )}
 
-      {/* 3. 선택된 일자 상세 출고 목록 (달력 바로 아래 즉시 노출) */}
+      {/* 3. 선택된 일자 상세 도착 목록 (달력 바로 아래 즉시 노출) */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
             <h2 className="text-2xl md:text-3xl font-black text-slate-900">
-              {selectedDate} 출고 상세 ({selectedDaySummary.orderCount}건)
+              {selectedDate} 택배 도착 상세 ({selectedDaySummary.orderCount}건)
             </h2>
             <p className="text-base text-slate-600 font-bold mt-1">
-              10kg: {selectedDaySummary.qty10kg}개 &middot; 20kg:{" "}
-              {selectedDaySummary.qty20kg}개 &middot; 총 중량:{" "}
-              {selectedDaySummary.totalWeight}kg
+              절임배추 20kg: <span className="text-emerald-800 font-black">{selectedDaySummary.qty20kg}박스</span> (총 {selectedDaySummary.totalWeight}kg)
             </p>
           </div>
 
@@ -466,13 +474,13 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
             className="btn-large px-6 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-black cursor-pointer flex items-center gap-2 shadow-xs transition-colors"
           >
             <Plus className="w-5 h-5" />
-            <span>이 날짜로 새 주문 등록</span>
+            <span>이 날짜 도착으로 새 주문 등록</span>
           </button>
         </div>
 
         {selectedDaySummary.orders.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-lg font-bold">
-            선택하신 날짜({selectedDate})에는 등록된 출고 예약이 없습니다.
+            선택하신 날짜({selectedDate})에는 등록된 택배 도착 예약이 없습니다.
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
@@ -559,21 +567,21 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                 <div className="flex items-center gap-2">
                   <Package className="w-6 h-6 text-emerald-400" />
                   <h2 className="text-xl md:text-2xl font-black">
-                    {selectedDate} 출고 목록
+                    {selectedDate} 택배 도착 목록
                   </h2>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-2 text-xs md:text-sm font-bold">
                   <span className="bg-emerald-600 text-white px-2.5 py-0.5 rounded-full">
-                    총 {selectedDaySummary.orderCount}건 출고
+                    총 {selectedDaySummary.orderCount}건 도착
                   </span>
                   <span className="bg-slate-800 text-emerald-300 px-2.5 py-0.5 rounded-full border border-slate-700">
-                    10kg: {selectedDaySummary.qty10kg}개
-                  </span>
-                  <span className="bg-slate-800 text-blue-300 px-2.5 py-0.5 rounded-full border border-slate-700">
-                    20kg: {selectedDaySummary.qty20kg}개
+                    절임배추 20kg: {selectedDaySummary.qty20kg}박스
                   </span>
                   <span className="bg-slate-800 text-amber-300 px-2.5 py-0.5 rounded-full border border-slate-700">
                     총 {selectedDaySummary.totalWeight}kg
+                  </span>
+                  <span className="bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700">
+                    (농가 발송: 전날 D-1)
                   </span>
                 </div>
               </div>
@@ -675,7 +683,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                 className="flex-1 py-3 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-base md:text-lg font-black flex items-center justify-center gap-2 cursor-pointer shadow-xs transition-colors"
               >
                 <Plus className="w-5 h-5" />
-                <span>이 날짜로 주문 추가 등록</span>
+                <span>+ 이 날짜 도착으로 주문 추가 등록</span>
               </button>
 
               <button

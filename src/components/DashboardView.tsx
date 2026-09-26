@@ -151,17 +151,20 @@ export function DashboardView({
     <div className="space-y-6 max-w-5xl mx-auto pb-16">
       {/* 1. 상단 날짜 및 바로가기 액션 바 */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Calendar className="w-6 h-6 text-slate-700" />
-          <span className="text-xl md:text-2xl font-extrabold text-slate-900">
-            출고 기준일:
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <Calendar className="w-6 h-6 text-emerald-700 shrink-0" />
+          <span className="text-xl md:text-2xl font-black text-slate-900">
+            택배 도착 기준일:
           </span>
           <input
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="text-lg md:text-xl font-bold border-2 border-slate-300 rounded-lg px-3 py-2 bg-slate-50 focus:border-emerald-600 focus:bg-white focus:outline-hidden"
+            className="text-lg md:text-xl font-black border-2 border-emerald-500 rounded-lg px-3 py-2 bg-emerald-50/40 focus:border-emerald-700 focus:bg-white focus:outline-hidden"
           />
+          <span className="text-xs md:text-sm font-bold text-slate-500">
+            (소비자 배추 수령일 기준)
+          </span>
         </div>
 
         <div className="flex gap-2">
@@ -185,37 +188,33 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* 2. 오늘 보낼 절임배추 수량 요약 카드 */}
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm">
-        <div className="border-b border-slate-200 pb-3 mb-5 flex justify-between items-center">
-          <h2 className="text-2xl md:text-3xl font-black text-slate-900">
-            {selectedDate} 출고 현황
-          </h2>
-          <span className="text-base md:text-lg font-bold text-slate-600">
-            총 {summary.totalOrders}건 출고 예정
+      {/* 2. 오늘 도착 절임배추 수량 요약 카드 & 발송 안내 */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm space-y-5">
+        <div className="border-b border-slate-200 pb-3 flex flex-wrap justify-between items-center gap-2">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-black text-slate-900">
+              {selectedDate} 택배 도착 현황
+            </h2>
+            <p className="text-sm font-bold text-emerald-800 mt-0.5">
+              농가 택배 발송 및 포장일: {format(addDays(new Date(selectedDate + "T00:00:00"), -1), "yyyy년 M월 d일 (EEE)")} (도착 전날 D-1)
+            </p>
+          </div>
+          <span className="text-base md:text-lg font-black text-slate-700 bg-slate-100 px-3 py-1 rounded-xl">
+            총 {summary.totalOrders}건 도착 예정
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-          <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-5">
-            <div className="text-lg md:text-xl font-extrabold text-emerald-900 mb-1">
-              절임배추 10kg
-            </div>
-            <div className="text-4xl md:text-5xl font-black text-emerald-700 stat-number">
-              {summary.qty10kg} <span className="text-2xl font-bold">박스</span>
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-5">
-            <div className="text-lg md:text-xl font-extrabold text-blue-900 mb-1">
+          <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 shadow-xs">
+            <div className="text-lg md:text-xl font-black text-emerald-950 mb-1">
               절임배추 20kg
             </div>
-            <div className="text-4xl md:text-5xl font-black text-blue-700 stat-number">
+            <div className="text-4xl md:text-5xl font-black text-emerald-700 stat-number">
               {summary.qty20kg} <span className="text-2xl font-bold">박스</span>
             </div>
           </div>
 
-          <div className="bg-slate-100 border-2 border-slate-300 rounded-xl p-5">
+          <div className="bg-slate-100 border-2 border-slate-300 rounded-2xl p-5">
             <div className="text-lg md:text-xl font-extrabold text-slate-800 mb-1">
               총 중량
             </div>
@@ -223,25 +222,40 @@ export function DashboardView({
               {summary.totalWeight} <span className="text-2xl font-bold">kg</span>
             </div>
           </div>
+
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5">
+            <div className="text-lg md:text-xl font-extrabold text-amber-950 mb-1">
+              당일 미입금
+            </div>
+            <div className="text-4xl md:text-5xl font-black text-amber-800 stat-number">
+              {summary.unpaidCount} <span className="text-2xl font-bold">건</span>
+            </div>
+            <div className="text-xs font-bold text-amber-700 mt-1">
+              {formatPrice(summary.unpaidTotal)}
+            </div>
+          </div>
         </div>
 
-        <div className="mt-5 pt-4 border-t border-slate-200 text-right">
+        <div className="pt-2 flex flex-wrap justify-between items-center gap-2">
+          <div className="text-sm font-bold text-slate-600">
+            💡 내일 도착할 배추는 오늘 우체국택배로 발송해야 합니다.
+          </div>
           <button
             onClick={onGoToShipments}
-            className="inline-flex items-center gap-2 text-lg font-bold text-emerald-800 hover:text-emerald-900 hover:underline cursor-pointer"
+            className="inline-flex items-center gap-2 text-base md:text-lg font-black text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer"
           >
-            포장 및 택배 운송장 등록하러 가기 <ArrowRight className="w-5 h-5" />
+            택배 발송 및 운송장 등록 바로가기 <ArrowRight className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* 3. [신규 기능] 홈 화면 "이번 주 7일 출고 스케줄러" 위젯 */}
+      {/* 3. [신규 기능] 홈 화면 "이번 주 7일 택배 도착 스케줄러" 위젯 */}
       <div className="bg-white rounded-2xl border-2 border-emerald-300 p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-6 h-6 text-emerald-700" />
             <h2 className="text-2xl font-black text-slate-900">
-              이번 주 7일 출고 스케줄러
+              이번 주 7일 택배 도착 스케줄러
             </h2>
           </div>
 
@@ -249,13 +263,13 @@ export function DashboardView({
             onClick={onGoToCalendar}
             className="inline-flex items-center gap-1.5 text-base font-black text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
           >
-            <span>월간 달력 전체 보기</span>
+            <span>도착 달력 전체 보기</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
 
         <p className="text-sm text-slate-600 font-semibold mb-3">
-          날짜 카드를 누르면 해당 날짜의 출고 현황과 주문 목록으로 즉시 전환됩니다:
+          날짜 카드를 누르면 해당 날짜의 택배 도착 현황과 주문 목록으로 즉시 전환됩니다:
         </p>
 
         {/* 7일간 카드 가로 스크롤/그리드 */}
@@ -303,12 +317,12 @@ export function DashboardView({
 
                   {count > 0 ? (
                     <div className="space-y-0.5 text-xs font-black">
-                      <div className="text-emerald-900">10k: {sched.qty10kg}개</div>
-                      <div className="text-blue-900">20k: {sched.qty20kg}개</div>
+                      <div className="text-emerald-950 font-black">20kg {sched.qty20kg}박스</div>
+                      <div className="text-[10px] text-slate-500 font-bold">(발송: D-1)</div>
                     </div>
                   ) : (
                     <div className="text-xs text-slate-400 py-1 font-medium">
-                      예약 없음
+                      도착 없음
                     </div>
                   )}
                 </div>
@@ -389,17 +403,17 @@ export function DashboardView({
         )}
       </div>
 
-      {/* 5. 선택된 일자 출고 목록 */}
+      {/* 5. 선택된 일자 택배 도착 목록 */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-slate-900">
-            {selectedDate} 출고 목록 ({orders.length}명)
+            {selectedDate} 택배 도착 목록 ({orders.length}명)
           </h2>
         </div>
 
         {orders.length === 0 ? (
           <div className="py-12 text-center text-slate-500 text-lg">
-            해당 날짜에 등록된 출고 주문이 없습니다.
+            해당 날짜에 등록된 택배 도착 주문이 없습니다.
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
