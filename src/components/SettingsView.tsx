@@ -2,13 +2,19 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Save, Building2, Phone, Tag } from "lucide-react";
+import { Save, Building2, Phone, Tag, Database } from "lucide-react";
+import { fetchSettingsService, saveSettingsService } from "@/lib/services";
+import { getStoredTursoConfig } from "@/lib/clientDb";
 
 interface SettingsViewProps {
   onSettingsUpdated: () => void;
+  onRequestConfig: () => void;
 }
 
-export function SettingsView({ onSettingsUpdated }: SettingsViewProps) {
+export function SettingsView({
+  onSettingsUpdated,
+  onRequestConfig,
+}: SettingsViewProps) {
   const [shopName, setShopName] = useState("");
   const [shopPhone, setShopPhone] = useState("");
   const [bankName, setBankName] = useState("");
@@ -23,10 +29,10 @@ export function SettingsView({ onSettingsUpdated }: SettingsViewProps) {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const currentTurso = getStoredTursoConfig();
 
   useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => res.json())
+    fetchSettingsService()
       .then((data) => {
         if (data.settings) {
           setShopName(data.settings.shop_name || "임실 절임배추");
@@ -49,41 +55,37 @@ export function SettingsView({ onSettingsUpdated }: SettingsViewProps) {
           }
         }
       })
+      .catch((e) => {
+        if (e.message === "DB_NOT_CONFIGURED") {
+          onRequestConfig();
+        }
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [onRequestConfig]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          settings: {
-            shop_name: shopName,
-            shop_phone: shopPhone,
-            bank_name: bankName,
-            bank_account: bankAccount,
-            owner_name: ownerName,
-            default_courier: defaultCourier,
-          },
-          products: [
-            { id: product10Id, price: price10kg },
-            { id: product20Id, price: price20kg },
-          ].filter((p) => p.id !== null),
-        }),
-      });
+      await saveSettingsService(
+        {
+          shop_name: shopName,
+          shop_phone: shopPhone,
+          bank_name: bankName,
+          bank_account: bankAccount,
+          owner_name: ownerName,
+          default_courier: defaultCourier,
+        },
+        [
+          { id: product10Id!, price: price10kg },
+          { id: product20Id!, price: price20kg },
+        ].filter((p) => p.id !== null)
+      );
 
-      const json = await res.json();
-      if (json.success) {
-        alert("농가 정보 및 판매 단가가 저장되었습니다.");
-        onSettingsUpdated();
-      } else {
-        alert(json.error || "저장에 실패했습니다.");
-      }
-    } catch (e) {
-      alert("오류가 발생했습니다.");
+      alert("농가 정보 및 판매 단가가 저장되었습니다.");
+      onSettingsUpdated();
+    } catch (e: any) {
+      alert("저장 실패: " + e.message);
     } finally {
       setSaving(false);
     }
@@ -98,18 +100,36 @@ export function SettingsView({ onSettingsUpdated }: SettingsViewProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto pb-20">
+    <div className="max-w-3xl mx-auto pb-20 space-y-6">
+      {/* 1. Turso DB 연결 상태 카드 */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xl font-black text-slate-900">
+            <Database className="w-5 h-5 text-emerald-700" />
+            <span>Turso 데이터베이스 연결 정보</span>
+          </div>
+          <p className="text-sm text-slate-600 mt-1 font-mono truncate max-w-md">
+            연결 URL: {currentTurso?.url || "미설정"}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onRequestConfig}
+          className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-sm cursor-pointer transition-colors"
+        >
+          DB 연결 정보 변경
+        </button>
+      </div>
+
+      {/* 2. 농가 정보 및 단가 설정 폼 */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 md:p-8 shadow-sm">
         <h1 className="text-2xl md:text-3xl font-black text-slate-900 border-b border-slate-200 pb-4 mb-6">
           농가 기본 정보 및 판매 단가 설정
         </h1>
 
-        <p className="text-base text-slate-600 mb-6">
-          여기에 입력하신 실제 전화번호와 계좌번호는 상단 헤더와 고객 문자 안내에 자동으로 표기됩니다.
-        </p>
-
         <form onSubmit={handleSave} className="space-y-6">
-          {/* 1. 상호명 및 대표 전화번호 */}
+          {/* 상호명 및 대표 전화번호 */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-5 space-y-4">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <Phone className="w-5 h-5 text-emerald-700" />
@@ -143,7 +163,7 @@ export function SettingsView({ onSettingsUpdated }: SettingsViewProps) {
             </div>
           </div>
 
-          {/* 2. 실제 입금 계좌정보 */}
+          {/* 실제 입금 계좌정보 */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-5 space-y-4">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-amber-600" />
@@ -205,7 +225,7 @@ export function SettingsView({ onSettingsUpdated }: SettingsViewProps) {
             </div>
           </div>
 
-          {/* 3. 절임배추 단가 설정 */}
+          {/* 절임배추 단가 설정 */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-5 space-y-4">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               <Tag className="w-5 h-5 text-blue-700" />
@@ -249,7 +269,6 @@ export function SettingsView({ onSettingsUpdated }: SettingsViewProps) {
             </div>
           </div>
 
-          {/* 저장 버튼 */}
           <button
             type="submit"
             disabled={saving}

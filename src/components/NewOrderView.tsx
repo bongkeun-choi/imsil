@@ -2,8 +2,13 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Search, Plus, Minus, UserCheck, Check, AlertCircle } from "lucide-react";
+import { Plus, Minus, UserCheck } from "lucide-react";
 import { format, addDays } from "date-fns";
+import {
+  fetchSettingsService,
+  fetchCustomersService,
+  createOrderService,
+} from "@/lib/services";
 
 interface NewOrderViewProps {
   settings: {
@@ -13,9 +18,14 @@ interface NewOrderViewProps {
     owner_name?: string;
   };
   onOrderSaved: () => void;
+  onRequestConfig: () => void;
 }
 
-export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
+export function NewOrderView({
+  settings,
+  onOrderSaved,
+  onRequestConfig,
+}: NewOrderViewProps) {
   // 고객 정보
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -25,7 +35,6 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
 
   // 기존 고객 자동검색 결과
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
-  const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
 
   // 상품 단가 및 수량
   const [products, setProducts] = useState<any[]>([]);
@@ -37,35 +46,34 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
     return format(addDays(new Date(), 1), "yyyy-MM-dd");
   });
 
-  // 입금 상태 (UNPAID 또는 PAID)
+  // 입금 상태
   const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 상품 목록 불러오기
   useEffect(() => {
-    fetch("/api/settings")
-      .then((res) => res.json())
+    fetchSettingsService()
       .then((data) => {
         if (data.products) {
           setProducts(data.products);
         }
       })
-      .catch((e) => console.error(e));
-  }, []);
+      .catch((e) => {
+        if (e.message === "DB_NOT_CONFIGURED") {
+          onRequestConfig();
+        }
+      });
+  }, [onRequestConfig]);
 
   // 전화번호 뒷자리 또는 입력 시 기존 고객 검색
   useEffect(() => {
     const clean = phone.replace(/[^0-9]/g, "");
     if (clean.length >= 3) {
-      setIsSearchingCustomer(true);
-      fetch(`/api/customers?q=${clean}`)
-        .then((res) => res.json())
+      fetchCustomersService(clean)
         .then((res) => {
-          if (res.success) {
-            setCustomerSuggestions(res.customers || []);
-          }
+          setCustomerSuggestions(res || []);
         })
-        .finally(() => setIsSearchingCustomer(false));
+        .catch(() => setCustomerSuggestions([]));
     } else {
       setCustomerSuggestions([]);
     }
@@ -137,30 +145,21 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          phone: phone.trim(),
-          address: address.trim(),
-          address_detail: addressDetail.trim(),
-          shipping_date: shippingDate,
-          items,
-          payment_status: paymentStatus,
-          memo: memo.trim(),
-        }),
+      await createOrderService({
+        name: name.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        address_detail: addressDetail.trim(),
+        shipping_date: shippingDate,
+        items,
+        payment_status: paymentStatus,
+        memo: memo.trim(),
       });
 
-      const json = await res.json();
-      if (json.success) {
-        alert("주문이 성공적으로 등록되었습니다!");
-        onOrderSaved();
-      } else {
-        alert(json.error || "주문 등록에 실패했습니다.");
-      }
-    } catch (e) {
-      alert("주문 처리 중 오류가 발생했습니다.");
+      alert("주문이 성공적으로 등록되었습니다!");
+      onOrderSaved();
+    } catch (e: any) {
+      alert("주문 처리 중 오류가 발생했습니다: " + e.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -179,18 +178,15 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
             <label className="block text-lg md:text-xl font-extrabold text-slate-900 mb-2">
               전화번호 (뒷자리 또는 전체) <span className="text-red-600">*</span>
             </label>
-            <div className="relative">
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="예: 010-1234-5678 또는 뒷 4자리"
-                className="w-full text-xl md:text-2xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
-                required
-              />
-            </div>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="예: 010-1234-5678 또는 뒷 4자리"
+              className="w-full text-xl md:text-2xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
+              required
+            />
 
-            {/* 기존 고객 검색 결과 추천 목록 (터치 한 번으로 채우기) */}
             {customerSuggestions.length > 0 && (
               <div className="mt-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-3 space-y-2">
                 <div className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
@@ -261,13 +257,12 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
             />
           </div>
 
-          {/* 4. 포장 단위 및 수량 선택 (큼직한 +/- 버튼) */}
+          {/* 4. 포장 단위 및 수량 선택 */}
           <div className="border-t border-b border-slate-200 py-6 space-y-4">
             <h2 className="text-xl md:text-2xl font-black text-slate-900">
               주문 품목 및 수량
             </h2>
 
-            {/* 10kg 박스 */}
             <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="text-xl font-black text-slate-900">
@@ -299,7 +294,6 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
               </div>
             </div>
 
-            {/* 20kg 박스 */}
             <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
               <div>
                 <div className="text-xl font-black text-slate-900">
@@ -346,7 +340,7 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
             />
           </div>
 
-          {/* 6. 입금 상태 선택 (버튼형 라디오) */}
+          {/* 6. 입금 상태 선택 */}
           <div>
             <label className="block text-lg md:text-xl font-extrabold text-slate-900 mb-2">
               입금 여부
@@ -391,7 +385,7 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
             />
           </div>
 
-          {/* 8. 총 금액 요약 및 실제 계좌 안내 */}
+          {/* 8. 총 금액 요약 */}
           <div className="bg-slate-900 text-white rounded-2xl p-6">
             <div className="flex justify-between items-center text-xl font-bold mb-2">
               <span>총 주문 금액:</span>
@@ -404,7 +398,7 @@ export function NewOrderView({ settings, onOrderSaved }: NewOrderViewProps) {
             </div>
           </div>
 
-          {/* 9. 저장 버튼 (최대 강조) */}
+          {/* 9. 저장 버튼 */}
           <button
             type="submit"
             disabled={isSubmitting}

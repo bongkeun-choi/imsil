@@ -55,14 +55,23 @@ npm run dev
 
 ---
 
-## 배포 (Vercel)
+## GitHub Pages 무료 배포 방법 (3단계)
 
-Vercel에 연동하여 배포할 경우:
-1. GitHub 저장소를 Vercel 프로젝트로 불러옵니다.
-2. **Environment Variables**에 다음 두 가지를 등록합니다:
-   - `TURSO_DATABASE_URL`
-   - `TURSO_AUTH_TOKEN`
-3. 배포가 완료되면 스마트폰 브라우저에서 접속 후 **[홈 화면에 추가]**를 누르면 앱처럼 설치되어 사용할 수 있습니다.
+본 프로그램은 서버 없이 GitHub Pages에서 100% 완전 무료로 동작합니다:
+
+1. **GitHub 저장소로 코드 푸시**
+   ```bash
+   git push -u origin main
+   ```
+2. **GitHub 저장소 설정에서 Pages 활성화**
+   - GitHub 저장소(`https://github.com/bongkeun-choi/imsil`)로 이동합니다.
+   - 상단 **Settings** → 좌측 **Pages** 메뉴 클릭.
+   - **Build and deployment > Source** 항목을 `Deploy from a branch`에서 **`GitHub Actions`** 로 변경합니다.
+3. **배포 완료 및 사용**
+   - 상단 **Actions** 탭에서 배포가 1분 만에 자동으로 완료됩니다.
+   - 완료 후 제공되는 주소(`https://bongkeun-choi.github.io/imsil/`)로 스마트폰이나 PC에서 접속합니다.
+   - 첫 접속 시 나타나는 모달 창에 본인의 **Turso DB URL과 Auth Token**을 입력하면 즉시 나만의 전용 주문관리 시스템으로 동작합니다!
+   - 스마트폰 브라우저 메뉴에서 **[홈 화면에 추가]**를 누르면 앱처럼 설치되어 사용할 수 있습니다.
 
 ---
 

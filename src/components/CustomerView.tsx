@@ -2,9 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Search, Phone, MessageSquare, Clock, MapPin } from "lucide-react";
+import { Phone, MessageSquare, MapPin } from "lucide-react";
+import { fetchCustomersService, fetchCustomerDetailService } from "@/lib/services";
 
-export function CustomerView() {
+interface CustomerViewProps {
+  onRequestConfig: () => void;
+}
+
+export function CustomerView({ onRequestConfig }: CustomerViewProps) {
   const [query, setQuery] = useState("");
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,13 +19,14 @@ export function CustomerView() {
   const fetchCustomers = async (searchQuery: string = "") => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/customers?q=${searchQuery}`);
-      const json = await res.json();
-      if (json.success) {
-        setCustomers(json.customers || []);
+      const res = await fetchCustomersService(searchQuery);
+      setCustomers(res || []);
+    } catch (e: any) {
+      if (e.message === "DB_NOT_CONFIGURED") {
+        onRequestConfig();
+      } else {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -35,15 +41,11 @@ export function CustomerView() {
     fetchCustomers(query);
   };
 
-  // 고객 상세 및 주문 이력 조회
   const loadCustomerDetail = async (id: number) => {
     setSelectedCustomerId(id);
     try {
-      const res = await fetch(`/api/customers?id=${id}`);
-      const json = await res.json();
-      if (json.success) {
-        setCustomerDetail(json);
-      }
+      const res = await fetchCustomerDetailService(id);
+      setCustomerDetail(res);
     } catch (e) {
       console.error(e);
     }
@@ -51,7 +53,6 @@ export function CustomerView() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
-      {/* 1. 검색 바 */}
       <div className="bg-white p-6 rounded-2xl border-2 border-slate-300 shadow-xs">
         <form onSubmit={handleSearch} className="flex gap-3">
           <input
@@ -71,7 +72,6 @@ export function CustomerView() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* 2. 고객 목록 (좌측) */}
         <div className="md:col-span-2 bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm">
           <h2 className="text-2xl font-black text-slate-900 border-b border-slate-200 pb-3 mb-4">
             등록된 단골 고객 목록 ({customers.length}명)
@@ -142,7 +142,6 @@ export function CustomerView() {
           )}
         </div>
 
-        {/* 3. 선택된 고객의 과거 주문 이력 (우측) */}
         <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm">
           <h3 className="text-xl font-black text-slate-900 border-b border-slate-200 pb-3 mb-4">
             과거 주문 이력

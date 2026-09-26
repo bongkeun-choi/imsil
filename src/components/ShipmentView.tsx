@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Download, CheckSquare, Square, Truck, MessageSquare, Phone, RefreshCw } from "lucide-react";
+import { Download, CheckSquare, Square, MessageSquare, Phone, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
+import { fetchOrdersService, updateOrderActionService } from "@/lib/services";
 
 interface ShipmentViewProps {
   settings: {
@@ -13,9 +14,10 @@ interface ShipmentViewProps {
     bank_account?: string;
     owner_name?: string;
   };
+  onRequestConfig: () => void;
 }
 
-export function ShipmentView({ settings }: ShipmentViewProps) {
+export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
   const [selectedDate, setSelectedDate] = useState(() => {
     return format(new Date(), "yyyy-MM-dd");
   });
@@ -27,13 +29,14 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
   const fetchOrders = async (dateStr: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/orders?date=${dateStr}`);
-      const json = await res.json();
-      if (json.success) {
-        setOrders(json.orders || []);
+      const res = await fetchOrdersService(dateStr);
+      setOrders(res || []);
+    } catch (e: any) {
+      if (e.message === "DB_NOT_CONFIGURED") {
+        onRequestConfig();
+      } else {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -46,15 +49,8 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
   // 포장완료 원클릭 토글
   const handleTogglePacked = async (orderId: number) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_packed" }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        fetchOrders(selectedDate);
-      }
+      await updateOrderActionService(orderId, "mark_packed");
+      fetchOrders(selectedDate);
     } catch (e) {
       alert("상태 변경 오류");
     }
@@ -64,26 +60,18 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
   const handleSaveTracking = async (orderId: number) => {
     if (!trackingInput.trim()) return;
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "mark_shipped",
-          tracking_no: trackingInput.trim(),
-        }),
+      await updateOrderActionService(orderId, "mark_shipped", {
+        tracking_no: trackingInput.trim(),
       });
-      const json = await res.json();
-      if (json.success) {
-        setEditingTrackingId(null);
-        setTrackingInput("");
-        fetchOrders(selectedDate);
-      }
+      setEditingTrackingId(null);
+      setTrackingInput("");
+      fetchOrders(selectedDate);
     } catch (e) {
       alert("운송장 저장 오류");
     }
   };
 
-  // 택배사 제출용 CSV 엑셀 다운로드 (BOM 추가하여 한글 깨짐 방지)
+  // 택배사 제출용 CSV 엑셀 다운로드 (BOM 추가)
   const downloadCsv = () => {
     if (orders.length === 0) {
       alert("출력할 주문 내역이 없습니다.");
@@ -128,7 +116,7 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
     document.body.removeChild(link);
   };
 
-  // 문자 발송 링크 생성 (실제 상호, 계좌, 출고일 포함)
+  // 문자 발송 링크 생성
   const makeSmsUrl = (ord: any) => {
     const shop = settings.shop_name || "임실 절임배추";
     const bank = `${settings.bank_name || "농협"} ${settings.bank_account || ""} (${settings.owner_name || ""})`;
@@ -180,7 +168,7 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
         </button>
       </div>
 
-      {/* 2. 출고 명단 목록 (작업장 체크리스트 스타일) */}
+      {/* 2. 출고 명단 목록 */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm">
         <div className="border-b border-slate-200 pb-3 mb-4 flex justify-between items-center">
           <h2 className="text-2xl md:text-3xl font-black text-slate-900">
@@ -214,7 +202,6 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
                   }`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
-                    {/* 왼쪽 정보: 고객명, 수량, 주소 */}
                     <div className="space-y-1.5 flex-1 min-w-[280px]">
                       <div className="flex items-center gap-3">
                         <span className="text-2xl font-black text-slate-900">
@@ -237,14 +224,12 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
                         </a>
                       </div>
 
-                      {/* 품목 및 수량 */}
                       <div className="text-xl font-black text-emerald-900">
                         {(ord.items || [])
                           .map((i: any) => `${i.product_name} × ${i.quantity}개`)
                           .join("  /  ")}
                       </div>
 
-                      {/* 배송지 */}
                       <div className="text-lg text-slate-800 font-medium">
                         주소: {ord.shipping_address} {ord.shipping_address_detail}
                       </div>
@@ -256,9 +241,7 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
                       )}
                     </div>
 
-                    {/* 오른쪽 액션: 포장체크 & 운송장 */}
                     <div className="flex flex-col items-end gap-3">
-                      {/* 포장완료 버튼 */}
                       <button
                         onClick={() => handleTogglePacked(ord.id)}
                         className={`btn-large px-5 rounded-xl border-2 cursor-pointer flex items-center gap-2 font-bold transition-all ${
@@ -280,7 +263,6 @@ export function ShipmentView({ settings }: ShipmentViewProps) {
                         )}
                       </button>
 
-                      {/* 운송장 번호 */}
                       {editingTrackingId === ord.id ? (
                         <div className="flex items-center gap-2">
                           <input

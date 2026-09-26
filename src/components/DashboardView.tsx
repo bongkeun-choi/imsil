@@ -2,14 +2,20 @@
 
 import React, { useEffect, useState } from "react";
 import { formatPrice } from "@/lib/utils";
+import { fetchDashboardService, updateOrderActionService } from "@/lib/services";
 import { CheckCircle2, AlertCircle, ArrowRight, RefreshCw, Calendar } from "lucide-react";
 
 interface DashboardViewProps {
   onGoToNewOrder: () => void;
   onGoToShipments: () => void;
+  onRequestConfig: () => void;
 }
 
-export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardViewProps) {
+export function DashboardView({
+  onGoToNewOrder,
+  onGoToShipments,
+  onRequestConfig,
+}: DashboardViewProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -20,13 +26,14 @@ export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardView
   const fetchDashboard = async (dateStr: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/dashboard?date=${dateStr}`);
-      const json = await res.json();
-      if (json.success) {
-        setData(json);
+      const res = await fetchDashboardService(dateStr);
+      setData(res);
+    } catch (e: any) {
+      if (e.message === "DB_NOT_CONFIGURED") {
+        onRequestConfig();
+      } else {
+        console.error(e);
       }
-    } catch (e) {
-      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -41,19 +48,10 @@ export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardView
     if (!confirm("해당 주문을 입금 완료 처리하시겠습니까?")) return;
     setUpdatingId(orderId);
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_paid" }),
-      });
-      const result = await res.json();
-      if (result.success) {
-        fetchDashboard(selectedDate);
-      } else {
-        alert(result.error || "입금 처리에 실패했습니다.");
-      }
+      await updateOrderActionService(orderId, "mark_paid");
+      fetchDashboard(selectedDate);
     } catch (e) {
-      alert("오류가 발생했습니다.");
+      alert("입금 처리에 실패했습니다.");
     } finally {
       setUpdatingId(null);
     }
@@ -113,7 +111,7 @@ export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardView
         </div>
       </div>
 
-      {/* 2. 오늘 보낼 절임배추 수량 요약 카드 (시니어 특화 대형 글꼴) */}
+      {/* 2. 오늘 보낼 절임배추 수량 요약 카드 */}
       <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm">
         <div className="border-b border-slate-200 pb-3 mb-5 flex justify-between items-center">
           <h2 className="text-2xl md:text-3xl font-black text-slate-900">
@@ -125,7 +123,6 @@ export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardView
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-          {/* 10kg 수량 */}
           <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-5">
             <div className="text-lg md:text-xl font-extrabold text-emerald-900 mb-1">
               절임배추 10kg
@@ -135,7 +132,6 @@ export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardView
             </div>
           </div>
 
-          {/* 20kg 수량 */}
           <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-5">
             <div className="text-lg md:text-xl font-extrabold text-blue-900 mb-1">
               절임배추 20kg
@@ -145,7 +141,6 @@ export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardView
             </div>
           </div>
 
-          {/* 총 중량 합계 */}
           <div className="bg-slate-100 border-2 border-slate-300 rounded-xl p-5">
             <div className="text-lg md:text-xl font-extrabold text-slate-800 mb-1">
               오늘 총 중량
@@ -220,7 +215,7 @@ export function DashboardView({ onGoToNewOrder, onGoToShipments }: DashboardView
         )}
       </div>
 
-      {/* 4. 오늘 출고 목록 (단순 표 / 시니어 가독성) */}
+      {/* 4. 오늘 출고 목록 */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-black text-slate-900">
