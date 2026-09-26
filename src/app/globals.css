@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 어르신/현장 터치 최적화 버튼 최소 높이 */
+.btn-large {
+  min-height: 52px;
+  font-size: 1.125rem; /* 18px */
+  font-weight: 600;
+}
+
+/* 숫자/금액 가독성 고대비 */
+.stat-number {
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
