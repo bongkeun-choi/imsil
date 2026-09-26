@@ -397,6 +397,176 @@ export async function updateOrderActionService(
   return false;
 }
 
+export interface UpdateOrderPayload {
+  orderId: number;
+  customerName: string;
+  customerPhone: string;
+  shippingDate: string;
+  shippingAddress: string;
+  shippingAddressDetail?: string;
+  items: Array<{
+    product_id: number;
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    weight_kg: number;
+  }>;
+  paymentStatus: "PAID" | "UNPAID";
+  memo?: string;
+}
+
+export async function updateOrderDetailService(data: UpdateOrderPayload) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+
+  const now = new Date().toISOString();
+  let totalAmount = 0;
+  for (const item of data.items) {
+    totalAmount += Number(item.unit_price) * Number(item.quantity);
+  }
+  const paidAmount = data.paymentStatus === "PAID" ? totalAmount : 0;
+
+  // 1. orders 업데이트
+  await db.execute({
+    sql: `UPDATE orders SET 
+            customer_name = ?,
+            customer_phone = ?,
+            shipping_address = ?,
+            shipping_address_detail = ?,
+            shipping_date = ?,
+            total_amount = ?,
+            paid_amount = ?,
+            payment_status = ?,
+            memo = ?,
+            updated_at = ?
+          WHERE id = ?`,
+    args: [
+      data.customerName,
+      data.customerPhone,
+      data.shippingAddress,
+      data.shippingAddressDetail || "",
+      data.shippingDate,
+      totalAmount,
+      paidAmount,
+      data.paymentStatus,
+      data.memo || "",
+      now,
+      data.orderId,
+    ],
+  });
+
+  // 2. 고객 정보 동기화
+  const cleanPhone = data.customerPhone.replace(/[^0-9]/g, "");
+  await db.execute({
+    sql: `UPDATE customers SET 
+            name = ?, 
+            address = ?, 
+            address_detail = ?, 
+            updated_at = ?
+          WHERE REPLACE(phone, '-', '') = ?`,
+    args: [
+      data.customerName,
+      data.shippingAddress,
+      data.shippingAddressDetail || "",
+      now,
+      cleanPhone,
+    ],
+  });
+
+  // 3. order_items 재등록
+  await db.execute({
+    sql: "DELETE FROM order_items WHERE order_id = ?",
+    args: [data.orderId],
+  });
+
+  for (const item of data.items) {
+    if (item.quantity > 0) {
+      const amount = Number(item.unit_price) * Number(item.quantity);
+      await db.execute({
+        sql: `INSERT INTO order_items (order_id, product_id, product_name, quantity, unit_price, weight_kg, amount)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          data.orderId,
+          item.product_id,
+          item.product_name,
+          Number(item.quantity),
+          Number(item.unit_price),
+          Number(item.weight_kg),
+          amount,
+        ],
+      });
+    }
+  }
+
+  // 4. payments 처리
+  if (data.paymentStatus === "PAID") {
+    const existingPayment = await db.execute({
+      sql: "SELECT id FROM payments WHERE order_id = ? LIMIT 1",
+      args: [data.orderId],
+    });
+    if (existingPayment.rows.length === 0) {
+      await db.execute({
+        sql: `INSERT INTO payments (order_id, amount, paid_at, payer_name, method, created_at)
+              VALUES (?, ?, ?, ?, '계좌이체', ?)`,
+        args: [data.orderId, totalAmount, now, data.customerName, now],
+      });
+    } else {
+      await db.execute({
+        sql: "UPDATE payments SET amount = ?, payer_name = ? WHERE order_id = ?",
+        args: [totalAmount, data.customerName, data.orderId],
+      });
+    }
+  }
+
+  // order_no 조회
+  const orderRes = await db.execute({
+    sql: "SELECT order_no FROM orders WHERE id = ?",
+    args: [data.orderId],
+  });
+  const orderNo = orderRes.rows.length > 0 ? String(orderRes.rows[0].order_no) : "";
+
+  return { success: true, orderNo, totalAmount };
+}
+
+export async function deleteOrderService(orderId: number) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+
+  await db.execute({ sql: "DELETE FROM order_items WHERE order_id = ?", args: [orderId] });
+  await db.execute({ sql: "DELETE FROM shipments WHERE order_id = ?", args: [orderId] });
+  await db.execute({ sql: "DELETE FROM payments WHERE order_id = ?", args: [orderId] });
+  await db.execute({ sql: "DELETE FROM orders WHERE id = ?", args: [orderId] });
+  return true;
+}
+
+export async function fetchOrderByIdService(orderId: number) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+
+  const ordRes = await db.execute({
+    sql: `
+      SELECT o.*, s.tracking_no, s.courier, s.status as shipment_status
+      FROM orders o
+      LEFT JOIN shipments s ON s.order_id = o.id
+      WHERE o.id = ?
+    `,
+    args: [orderId],
+  });
+
+  if (ordRes.rows.length === 0) throw new Error("ORDER_NOT_FOUND");
+  const order = ordRes.rows[0];
+
+  const itemsRes = await db.execute({
+    sql: `SELECT * FROM order_items WHERE order_id = ?`,
+    args: [orderId],
+  });
+
+  return {
+    ...order,
+    items: itemsRes.rows,
+  };
+}
+
 export async function fetchCustomersService(query: string = "") {
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");

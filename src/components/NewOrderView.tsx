@@ -15,6 +15,7 @@ import {
   FileText,
   RefreshCw,
   Smartphone,
+  Share2,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
@@ -64,6 +65,8 @@ export function NewOrderView({
   });
   const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
   const [createdOrderShareData, setCreatedOrderShareData] = useState<OrderCardData | null>(null);
+  const [showPostOrderPrompt, setShowPostOrderPrompt] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // 2. 상품 및 수량 상태 (현재 판매 상품: 절임배추 20kg 단일 규격)
   const [products, setProducts] = useState<any[]>([]);
@@ -366,16 +369,12 @@ export function NewOrderView({
       };
 
       setCreatedOrderShareData(shareData);
+      setShowPostOrderPrompt(true);
     } catch (e: any) {
       alert("주문 처리 중 오류가 발생했습니다: " + e.message);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleCloseShareModal = () => {
-    setCreatedOrderShareData(null);
-    onOrderSaved();
   };
 
   return (
@@ -828,12 +827,60 @@ export function NewOrderView({
         </form>
       </div>
 
-      {/* 주문 등록 완료 후 문자 / 카카오톡 전송 모달 */}
-      {createdOrderShareData && (
+      {/* 1. 주문 등록 완료 후 문자/카톡 발송 확인 팝업 */}
+      {showPostOrderPrompt && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl border-4 border-emerald-600 animate-in zoom-in-95 duration-150">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-black text-slate-900">
+                주문 등록이 완료되었습니다!
+              </h3>
+              <p className="text-base text-slate-600 mt-2 font-semibold leading-relaxed">
+                고객님(<strong>{createdOrderShareData?.customerName}</strong>)에게 주문 확인서와 입금 계좌를 <strong>문자나 카카오톡으로 발송</strong>하시겠습니까?
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPostOrderPrompt(false);
+                  setShowShareModal(true);
+                }}
+                className="w-full py-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-lg font-black flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-98 transition-all"
+              >
+                <Share2 className="w-5 h-5" />
+                <span>예, 문자·카톡 발송하기</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPostOrderPrompt(false);
+                  onOrderSaved();
+                }}
+                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-base font-bold cursor-pointer transition-colors"
+              >
+                나중에 보내기 (완료)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. 문자 / 카카오톡 전송 모달 */}
+      {showShareModal && createdOrderShareData && (
         <OrderShareModal
           orderData={createdOrderShareData}
-          isOpen={!!createdOrderShareData}
-          onClose={handleCloseShareModal}
+          isOpen={showShareModal}
+          onClose={() => {
+            setShowShareModal(false);
+            onOrderSaved();
+          }}
           isNewOrder={true}
         />
       )}

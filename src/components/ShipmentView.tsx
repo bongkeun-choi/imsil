@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Download, CheckSquare, Square, MessageSquare, Phone, RefreshCw } from "lucide-react";
+import { Download, CheckSquare, Square, MessageSquare, Phone, RefreshCw, Edit3, Share2 } from "lucide-react";
 import { format } from "date-fns";
 import { fetchOrdersService, updateOrderActionService } from "@/lib/services";
+import { OrderEditModal } from "@/components/OrderEditModal";
+import { OrderShareModal } from "@/components/OrderShareModal";
+import { OrderCardData } from "@/lib/orderCardCanvas";
 
 interface ShipmentViewProps {
   settings: {
@@ -25,6 +28,61 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
   const [loading, setLoading] = useState(true);
   const [editingTrackingId, setEditingTrackingId] = useState<number | null>(null);
   const [trackingInput, setTrackingInput] = useState("");
+  const [editingOrder, setEditingOrder] = useState<any | null>(null);
+  const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
+
+  const handleOpenOrderShare = (ord: any) => {
+    const shareData: OrderCardData = {
+      orderNo: ord.order_no || "",
+      customerName: ord.customer_name || "",
+      customerPhone: ord.customer_phone || "",
+      shippingDate: ord.shipping_date || selectedDate,
+      shippingAddress: ord.shipping_address || "",
+      shippingAddressDetail: ord.shipping_address_detail || "",
+      itemsSummary: (ord.items || []).map((i: any) => `${i.product_name} ${i.quantity}개`).join(", ") || "절임배추 20kg",
+      totalAmount: Number(ord.total_amount) || 0,
+      paymentStatus: ord.payment_status || "UNPAID",
+      memo: ord.memo || "",
+      shopName: settings?.shop_name || "임실참배추농원",
+      shopPhone: settings?.shop_phone || "010-0000-0000",
+      bankName: settings?.bank_name || "농협",
+      bankAccount: settings?.bank_account || "",
+      ownerName: settings?.owner_name || "",
+    };
+    setSharingOrder(shareData);
+  };
+
+  const handleOpenOrderEdit = (ord: any) => {
+    const qty20kg = (ord.items && ord.items[0]?.quantity) || ord.qty20kg || 1;
+    setEditingOrder({
+      id: ord.id,
+      customer_id: ord.customer_id,
+      order_no: ord.order_no,
+      customer_name: ord.customer_name,
+      customer_phone: ord.customer_phone,
+      shipping_date: ord.shipping_date || selectedDate,
+      shipping_address: ord.shipping_address,
+      shipping_address_detail: ord.shipping_address_detail || "",
+      qty20kg: qty20kg,
+      unit_price: 68000,
+      total_amount: Number(ord.total_amount) || 68000 * qty20kg,
+      payment_status: ord.payment_status || "UNPAID",
+      memo: ord.memo || "",
+    });
+  };
+
+  const handleOrderUpdated = (shareData?: OrderCardData) => {
+    setEditingOrder(null);
+    fetchOrders(selectedDate);
+    if (shareData) {
+      setSharingOrder(shareData);
+    }
+  };
+
+  const handleOrderDeleted = () => {
+    setEditingOrder(null);
+    fetchOrders(selectedDate);
+  };
 
   const fetchOrders = async (dateStr: string) => {
     setLoading(true);
@@ -219,14 +277,24 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
                           <Phone className="w-4 h-4" />
                           <span>{ord.customer_phone}</span>
                         </a>
-                        <a
-                          href={makeSmsUrl(ord)}
-                          className="inline-flex items-center gap-1 text-base font-bold text-blue-800 bg-blue-50 px-2.5 py-1 rounded-md hover:bg-blue-100"
-                          title="문자 발송"
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOrderShare(ord)}
+                          className="inline-flex items-center gap-1 text-sm font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                          title="문자·카톡 안내장 전송"
                         >
-                          <MessageSquare className="w-4 h-4" />
-                          <span>문자</span>
-                        </a>
+                          <Share2 className="w-4 h-4 text-amber-700" />
+                          <span>문자·카톡</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenOrderEdit(ord)}
+                          className="inline-flex items-center gap-1 text-sm font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                          title="주문 정보 수정"
+                        >
+                          <Edit3 className="w-4 h-4 text-blue-700" />
+                          <span>수정</span>
+                        </button>
                       </div>
 
                       <div className="text-xl font-black text-emerald-900">
@@ -321,6 +389,28 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
           </div>
         )}
       </div>
+
+      {/* 주문 상세 수정 모달 */}
+      {editingOrder && (
+        <OrderEditModal
+          order={editingOrder}
+          isOpen={!!editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onOrderUpdated={handleOrderUpdated}
+          onOrderDeleted={handleOrderDeleted}
+          settings={settings}
+        />
+      )}
+
+      {/* 주문 문자 / 카카오톡 전송 모달 */}
+      {sharingOrder && (
+        <OrderShareModal
+          orderData={sharingOrder}
+          isOpen={!!sharingOrder}
+          onClose={() => setSharingOrder(null)}
+          isNewOrder={false}
+        />
+      )}
     </div>
   );
 }

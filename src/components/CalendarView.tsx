@@ -12,6 +12,7 @@ import {
   X,
   Package,
   Share2,
+  Edit3,
 } from "lucide-react";
 import {
   format,
@@ -32,6 +33,7 @@ import {
   DayScheduleSummary,
 } from "@/lib/services";
 import { OrderShareModal } from "@/components/OrderShareModal";
+import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
 
 interface CalendarViewProps {
@@ -47,6 +49,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
   );
   const [showOrderListModal, setShowOrderListModal] = useState(false);
   const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
+  const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [scheduleData, setScheduleData] = useState<
     Record<string, DayScheduleSummary>
   >({});
@@ -71,6 +74,38 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
       ownerName: settings?.owner_name || "",
     };
     setSharingOrder(shareData);
+  };
+
+  const handleOpenOrderEdit = (ord: any) => {
+    const qty20kg = ord.qty20kg || ord.quantity || (ord.items && ord.items[0]?.quantity) || 1;
+    setEditingOrder({
+      id: ord.id,
+      customer_id: ord.customer_id,
+      order_no: ord.order_no,
+      customer_name: ord.customer_name,
+      customer_phone: ord.customer_phone,
+      shipping_date: ord.shipping_date || selectedDate,
+      shipping_address: ord.shipping_address,
+      shipping_address_detail: ord.shipping_address_detail || "",
+      qty20kg: qty20kg,
+      unit_price: 68000,
+      total_amount: Number(ord.total_amount) || 68000 * qty20kg,
+      payment_status: ord.payment_status || "UNPAID",
+      memo: ord.memo || "",
+    });
+  };
+
+  const handleOrderUpdated = (shareData?: OrderCardData) => {
+    setEditingOrder(null);
+    loadSchedule();
+    if (shareData) {
+      setSharingOrder(shareData);
+    }
+  };
+
+  const handleOrderDeleted = () => {
+    setEditingOrder(null);
+    loadSchedule();
   };
 
   // 현재 월의 시작/끝 날짜 (달력 그리드용)
@@ -510,6 +545,15 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                       <Share2 className="w-3.5 h-3.5 text-amber-700" />
                       <span>문자·카톡</span>
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenOrderEdit(ord)}
+                      className="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors"
+                      title="주문 정보 수정"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-blue-700" />
+                      <span>수정</span>
+                    </button>
                   </div>
                   <div className="text-base text-slate-700 mt-1">
                     배송지: {ord.shipping_address}
@@ -622,6 +666,18 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                         <Share2 className="w-3.5 h-3.5 text-amber-700" />
                         <span>문자·카톡</span>
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleCloseModal();
+                          setEditingOrder(ord);
+                        }}
+                        className="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 px-2 py-0.5 rounded-md text-xs font-bold cursor-pointer transition-colors"
+                        title="주문 정보 수정"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                        <span>수정</span>
+                      </button>
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -705,6 +761,18 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
           isOpen={!!sharingOrder}
           onClose={() => setSharingOrder(null)}
           isNewOrder={false}
+        />
+      )}
+
+      {/* 주문 수정 모달 */}
+      {editingOrder && (
+        <OrderEditModal
+          order={editingOrder}
+          isOpen={!!editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onOrderUpdated={handleOrderUpdated}
+          onOrderDeleted={handleOrderDeleted}
+          settings={settings}
         />
       )}
     </div>

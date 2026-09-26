@@ -1,0 +1,457 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  Save,
+  Trash2,
+  AlertTriangle,
+  Minus,
+  Plus,
+  CheckCircle2,
+  Share2,
+} from "lucide-react";
+import { format, addDays } from "date-fns";
+import { formatPrice } from "@/lib/utils";
+import { updateOrderDetailService, deleteOrderService } from "@/lib/services";
+import { OrderCardData } from "@/lib/orderCardCanvas";
+
+interface OrderEditModalProps {
+  order: any;
+  isOpen: boolean;
+  onClose: () => void;
+  onOrderUpdated: (shareData?: OrderCardData) => void;
+  onOrderDeleted?: () => void;
+  settings?: any;
+}
+
+export function OrderEditModal({
+  order,
+  isOpen,
+  onClose,
+  onOrderUpdated,
+  onOrderDeleted,
+  settings,
+}: OrderEditModalProps) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [addressDetail, setAddressDetail] = useState("");
+  const [shippingDate, setShippingDate] = useState("");
+  const [qty20kg, setQty20kg] = useState(1);
+  const [unitPrice, setUnitPrice] = useState(68000);
+  const [paymentStatus, setPaymentStatus] = useState<"PAID" | "UNPAID">("UNPAID");
+  const [memo, setMemo] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // 저장 완료 후 문자/카톡 발송 여부 확인 팝업 상태
+  const [savedShareData, setSavedShareData] = useState<OrderCardData | null>(null);
+  const [showPostEditPrompt, setShowPostEditPrompt] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !order) return;
+
+    setName(order.customer_name || "");
+    setPhone(order.customer_phone || "");
+    setAddress(order.shipping_address || "");
+    setAddressDetail(order.shipping_address_detail || "");
+    setShippingDate(order.shipping_date || format(new Date(), "yyyy-MM-dd"));
+    setPaymentStatus(order.payment_status === "PAID" ? "PAID" : "UNPAID");
+    setMemo(order.memo || "");
+
+    // 수량 파싱: 20kg 아이템이 있으면 그 수량, 없으면 총 금액 기준 역산 또는 1
+    let q20 = 1;
+    let price = 68000;
+    if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+      const found20 = order.items.find((i: any) => Number(i.weight_kg) === 20);
+      if (found20) {
+        q20 = Number(found20.quantity) || 1;
+        price = Number(found20.unit_price) || 68000;
+      } else {
+        q20 = Number(order.items[0].quantity) || 1;
+        price = Number(order.items[0].unit_price) || 68000;
+      }
+    } else if (order.total_amount) {
+      q20 = Math.max(1, Math.round(Number(order.total_amount) / 68000));
+    }
+    setQty20kg(q20);
+    setUnitPrice(price);
+    setShowPostEditPrompt(false);
+    setSavedShareData(null);
+  }, [isOpen, order]);
+
+  // 스마트폰 뒤로가기 버튼 안전 연동
+  useEffect(() => {
+    if (!isOpen) return;
+    window.history.pushState({ modal: "order-edit" }, "");
+
+    const handlePopState = () => {
+      onClose();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !order) return null;
+
+  const handleCloseSafely = () => {
+    if (window.history.state?.modal === "order-edit") {
+      window.history.back();
+    } else {
+      onClose();
+    }
+  };
+
+  const getDispatchDateStr = (dateStr: string) => {
+    if (!dateStr) return "";
+    try {
+      const arr = new Date(dateStr + "T00:00:00");
+      if (isNaN(arr.getTime())) return "";
+      return format(addDays(arr, -1), "yyyy년 M월 d일 (EEE)");
+    } catch {
+      return "";
+    }
+  };
+
+  const totalAmount = qty20kg * unitPrice;
+
+  // 1. 주문 수정 저장
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return alert("고객 성함을 입력해 주세요.");
+    if (!phone.trim()) return alert("전화번호를 입력해 주세요.");
+    if (!address.trim()) return alert("배송지 주소를 입력해 주세요.");
+    if (qty20kg < 1) return alert("수량을 1박스 이상 지정해 주세요.");
+
+    setIsSaving(true);
+    try {
+      await updateOrderDetailService({
+        orderId: order.id,
+        customerName: name.trim(),
+        customerPhone: phone.trim(),
+        shippingDate: shippingDate,
+        shippingAddress: address.trim(),
+        shippingAddressDetail: addressDetail.trim(),
+        items: [
+          {
+            product_id: 2,
+            product_name: "절임배추 20kg",
+            quantity: qty20kg,
+            unit_price: unitPrice,
+            weight_kg: 20,
+          },
+        ],
+        paymentStatus,
+        memo: memo.trim(),
+      });
+
+      const shareData: OrderCardData = {
+        orderNo: order.order_no,
+        customerName: name.trim(),
+        customerPhone: phone.trim(),
+        shippingDate: shippingDate,
+        shippingAddress: address.trim(),
+        shippingAddressDetail: addressDetail.trim(),
+        itemsSummary: `절임배추 20kg ${qty20kg}박스`,
+        totalAmount,
+        paymentStatus,
+        memo: memo.trim(),
+        shopName: settings?.shop_name || "임실참배추농원",
+        shopPhone: settings?.shop_phone || settings?.phone || "010-0000-0000",
+        bankName: settings?.bank_name || "농협",
+        bankAccount: settings?.bank_account || "",
+        ownerName: settings?.owner_name || "",
+      };
+
+      setSavedShareData(shareData);
+      setShowPostEditPrompt(true);
+    } catch (err: any) {
+      console.error(err);
+      alert("주문 수정 중 오류가 발생했습니다: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 2. 주문 삭제 처리
+  const handleDelete = async () => {
+    if (
+      !confirm(
+        `정말로 ${name} 고객님의 주문(주문번호 #${order.order_no})을 삭제하시겠습니까?\n삭제된 주문은 복구할 수 없습니다.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deleteOrderService(order.id);
+      alert("주문이 삭제되었습니다.");
+      handleCloseSafely();
+      if (onOrderDeleted) onOrderDeleted();
+    } catch (err: any) {
+      console.error(err);
+      alert("주문 삭제 실패: " + err.message);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/65 flex items-center justify-center p-3 backdrop-blur-xs">
+      <div className="bg-white rounded-3xl max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border-4 border-slate-700 animate-in fade-in zoom-in duration-150">
+        {/* 모달 상단 헤더 */}
+        <div className="bg-slate-900 text-white p-4 md:p-5 rounded-t-[20px] flex items-center justify-between shrink-0">
+          <div>
+            <h3 className="text-xl md:text-2xl font-black">
+              주문 상세 및 정보 수정
+            </h3>
+            <p className="text-xs text-slate-300 font-semibold mt-0.5">
+              주문번호: #{order.order_no} | 등록일: {order.order_date || order.created_at?.slice(0, 10)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCloseSafely}
+            className="text-white hover:bg-slate-800 p-2 rounded-full cursor-pointer transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* 폼 본문 */}
+        <form onSubmit={handleSave} className="p-4 md:p-6 overflow-y-auto space-y-4 flex-1">
+          {/* 고객명 & 전화번호 */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-base font-bold text-slate-900 mb-1">
+                고객 성함 (받는 분) <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-base font-bold text-slate-900 mb-1">
+                전화번호 <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                required
+              />
+            </div>
+          </div>
+
+          {/* 택배 도착 희망일 선택 */}
+          <div className="bg-emerald-50/70 border-2 border-emerald-400 rounded-2xl p-4 space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="text-base font-black text-slate-900">
+                택배 도착 희망일 (배추 받는 날) <span className="text-red-600">*</span>
+              </label>
+              <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                소비자 수령 기준
+              </span>
+            </div>
+            <input
+              type="date"
+              value={shippingDate}
+              onChange={(e) => setShippingDate(e.target.value)}
+              className="w-full text-xl font-black border-2 border-emerald-500 rounded-xl px-3.5 py-2.5 focus:border-emerald-700 bg-white"
+              required
+            />
+            <div className="text-xs md:text-sm font-bold text-slate-700 pt-1 flex justify-between">
+              <span>🚚 농가 발송 예정일:</span>
+              <span className="text-emerald-800 font-black">
+                {getDispatchDateStr(shippingDate)} (도착 전날 D-1)
+              </span>
+            </div>
+          </div>
+
+          {/* 배송 주소 */}
+          <div className="space-y-2">
+            <label className="block text-base font-bold text-slate-900 mb-0.5">
+              배송지 주소 <span className="text-red-600">*</span>
+            </label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="기본 도로명/지번 주소"
+              className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+              required
+            />
+            <input
+              type="text"
+              value={addressDetail}
+              onChange={(e) => setAddressDetail(e.target.value)}
+              placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
+              className="w-full text-base border-2 border-slate-200 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+            />
+          </div>
+
+          {/* 절임배추 20kg 수량 변경 */}
+          <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-lg font-black text-slate-900">
+                  절임배추 20kg
+                </span>
+                <div className="text-xs text-slate-500 font-bold">
+                  단가: {formatPrice(unitPrice)}원 / 1박스
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setQty20kg((prev) => Math.max(1, prev - 1))}
+                  className="w-11 h-11 bg-white border-2 border-slate-300 rounded-xl text-xl font-black flex items-center justify-center hover:bg-slate-100 active:scale-95 cursor-pointer"
+                >
+                  <Minus className="w-5 h-5" />
+                </button>
+                <span className="text-3xl font-black w-10 text-center stat-number text-slate-900">
+                  {qty20kg}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQty20kg((prev) => prev + 1)}
+                  className="w-11 h-11 bg-emerald-700 text-white rounded-xl text-xl font-black flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-sm font-bold">
+              <span className="text-slate-600">총 결제 금액:</span>
+              <span className="text-xl font-black text-amber-600 stat-number">
+                {formatPrice(totalAmount)}원
+              </span>
+            </div>
+          </div>
+
+          {/* 입금 여부 */}
+          <div>
+            <label className="block text-base font-bold text-slate-900 mb-1">
+              입금 상태
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setPaymentStatus("UNPAID")}
+                className={`py-3 rounded-xl font-black text-base border-2 cursor-pointer transition-all ${
+                  paymentStatus === "UNPAID"
+                    ? "bg-red-50 text-red-700 border-red-400 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                입금 대기 (미입금)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentStatus("PAID")}
+                className={`py-3 rounded-xl font-black text-base border-2 cursor-pointer transition-all ${
+                  paymentStatus === "PAID"
+                    ? "bg-emerald-700 text-white border-emerald-700 shadow-xs"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                입금 완료
+              </button>
+            </div>
+          </div>
+
+          {/* 고객 메모 */}
+          <div>
+            <label className="block text-base font-bold text-slate-900 mb-1">
+              배송 / 주문 메모
+            </label>
+            <textarea
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="예: 문 앞에 놓아주세요 / 오후 배송 요망"
+              rows={2}
+              className="w-full text-base border-2 border-slate-200 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+            />
+          </div>
+
+          {/* 하단 저장 & 삭제 버튼 */}
+          <div className="pt-2 flex gap-3">
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="py-3.5 px-4 bg-red-50 hover:bg-red-100 text-red-700 border border-red-300 rounded-xl font-bold text-base flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+              title="주문 영구 삭제"
+            >
+              <Trash2 className="w-5 h-5 text-red-600" />
+              <span>주문 삭제</span>
+            </button>
+
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="flex-1 py-3.5 bg-emerald-700 hover:bg-emerald-800 active:scale-98 text-white rounded-xl font-black text-lg flex items-center justify-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-50"
+            >
+              <Save className="w-5 h-5" />
+              <span>{isSaving ? "저장 중..." : "수정 완료 저장"}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* 수정 완료 후 문자/카톡 발송 여부 확인 팝업 */}
+      {showPostEditPrompt && (
+        <div className="fixed inset-0 z-60 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl border-4 border-emerald-600 animate-in zoom-in-95 duration-150">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-10 h-10" />
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-black text-slate-900">
+                주문 수정이 완료되었습니다!
+              </h3>
+              <p className="text-base text-slate-600 mt-2 font-semibold leading-relaxed">
+                고객님(<strong>{name}</strong>)에게 변경된 택배 도착일과 주문 내역을 <strong>문자나 카카오톡으로 발송</strong>하시겠습니까?
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPostEditPrompt(false);
+                  handleCloseSafely();
+                  onOrderUpdated(savedShareData || undefined);
+                }}
+                className="w-full py-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-lg font-black flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-98 transition-all"
+              >
+                <Share2 className="w-5 h-5" />
+                <span>예, 문자·카톡 발송하기</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPostEditPrompt(false);
+                  handleCloseSafely();
+                  onOrderUpdated(undefined);
+                }}
+                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-base font-bold cursor-pointer transition-colors"
+              >
+                발송 안 함 (수정만 완료)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

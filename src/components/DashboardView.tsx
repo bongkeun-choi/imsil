@@ -17,9 +17,11 @@ import {
   CalendarDays,
   Sparkles,
   Share2,
+  Edit3,
 } from "lucide-react";
 import { format, addDays, eachDayOfInterval, isSameDay } from "date-fns";
 import { OrderShareModal } from "@/components/OrderShareModal";
+import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
 
 interface DashboardViewProps {
@@ -46,6 +48,41 @@ export function DashboardView({
   });
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
+  const [editingOrder, setEditingOrder] = useState<any | null>(null);
+
+  const handleOpenOrderEdit = (ord: any) => {
+    const qty20kg = ord.qty20kg || ord.quantity || (ord.items && ord.items[0]?.quantity) || 1;
+    setEditingOrder({
+      id: ord.id,
+      customer_id: ord.customer_id,
+      order_no: ord.order_no,
+      customer_name: ord.customer_name,
+      customer_phone: ord.customer_phone,
+      shipping_date: ord.shipping_date || selectedDate,
+      shipping_address: ord.shipping_address,
+      shipping_address_detail: ord.shipping_address_detail || "",
+      qty20kg: qty20kg,
+      unit_price: 68000,
+      total_amount: Number(ord.total_amount) || 68000 * qty20kg,
+      payment_status: ord.payment_status || "UNPAID",
+      memo: ord.memo || "",
+    });
+  };
+
+  const handleOrderUpdated = (shareData?: OrderCardData) => {
+    setEditingOrder(null);
+    fetchDashboard(selectedDate);
+    fetchWeekly();
+    if (shareData) {
+      setSharingOrder(shareData);
+    }
+  };
+
+  const handleOrderDeleted = () => {
+    setEditingOrder(null);
+    fetchDashboard(selectedDate);
+    fetchWeekly();
+  };
 
   const handleOpenOrderShare = (ord: any) => {
     const shareData: OrderCardData = {
@@ -389,6 +426,15 @@ export function DashboardView({
                     <span>문자·카톡</span>
                   </button>
                   <button
+                    type="button"
+                    onClick={() => handleOpenOrderEdit(ord)}
+                    className="btn-large px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg cursor-pointer flex items-center gap-1.5 font-bold shadow-xs transition-colors"
+                    title="주문 정보 수정"
+                  >
+                    <Edit3 className="w-4 h-4 text-blue-700" />
+                    <span>수정</span>
+                  </button>
+                  <button
                     onClick={() => handleMarkPaid(ord.id)}
                     disabled={updatingId === ord.id}
                     className="btn-large px-6 bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
@@ -475,12 +521,34 @@ export function DashboardView({
                     <Share2 className="w-4 h-4 text-amber-700" />
                     <span>문자·카톡</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenOrderEdit(ord)}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg text-sm font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="주문 정보 수정"
+                  >
+                    <Edit3 className="w-4 h-4 text-blue-700" />
+                    <span>수정</span>
+                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* 주문 상세 수정 모달 */}
+      {editingOrder && (
+        <OrderEditModal
+          order={editingOrder}
+          isOpen={!!editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onOrderUpdated={handleOrderUpdated}
+          onOrderDeleted={handleOrderDeleted}
+          settings={settings}
+        />
+      )}
 
       {/* 주문 문자 / 카카오톡 전송 모달 */}
       {sharingOrder && (
