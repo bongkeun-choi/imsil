@@ -9,7 +9,7 @@
     "lint": "eslint",
     "db:setup": "node scripts/setup-db.mjs",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d out -t true"
+    "deploy": "gh-pages -d out --dotfiles --nojekyll"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
