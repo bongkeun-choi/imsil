@@ -12,8 +12,19 @@ import { SmartOrderImportView } from "@/components/SmartOrderImportView";
 import { fetchSettingsService } from "@/lib/services";
 import { initClientTables, getClientDb } from "@/lib/clientDb";
 
+const VALID_TABS = [
+  "dashboard",
+  "calendar",
+  "smart-import",
+  "new-order",
+  "shipments",
+  "customers",
+  "settings",
+];
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showExitToast, setShowExitToast] = useState(false);
   const [orderTargetDate, setOrderTargetDate] = useState<string | undefined>(
     undefined
   );
@@ -36,6 +47,62 @@ export default function Home() {
     }
   }, []);
 
+  // 모바일 뒤로가기(popstate) 및 브라우저 히스토리 연동
+  useEffect(() => {
+    const getTabFromHash = () => {
+      if (typeof window === "undefined") return "dashboard";
+      const raw = window.location.hash.replace("#", "").split("/")[0].split("?")[0];
+      return VALID_TABS.includes(raw) ? raw : "dashboard";
+    };
+
+    const initialTab = getTabFromHash();
+    setActiveTab(initialTab);
+
+    // 최초 진입 시 히스토리 스택 초기화
+    if (typeof window !== "undefined") {
+      if (!window.history.state || !window.history.state.tab) {
+        window.history.replaceState({ tab: "dashboard", isRoot: true }, "", "#dashboard");
+        if (initialTab !== "dashboard") {
+          window.history.pushState({ tab: initialTab }, "", "#" + initialTab);
+        }
+      }
+    }
+
+    let exitToastTimer: NodeJS.Timeout | null = null;
+    let lastBackPressTime = 0;
+
+    const handlePopState = (e: PopStateEvent) => {
+      const targetTab = e.state?.tab || getTabFromHash();
+
+      if (targetTab && targetTab !== "dashboard" && VALID_TABS.includes(targetTab)) {
+        setActiveTab(targetTab);
+      } else {
+        // 대시보드(홈) 도달 시
+        setActiveTab("dashboard");
+
+        const now = Date.now();
+        // 2초 내에 뒤로 가기를 한 번 더 누르면 앱 정상 종료 허용
+        if (now - lastBackPressTime < 2000) {
+          return;
+        }
+
+        // 첫 번째 뒤로 가기: 종료 방지 토스트 표시 및 상태 복원
+        lastBackPressTime = now;
+        setShowExitToast(true);
+        if (exitToastTimer) clearTimeout(exitToastTimer);
+        exitToastTimer = setTimeout(() => setShowExitToast(false), 2000);
+
+        window.history.pushState({ tab: "dashboard", isRoot: true }, "", "#dashboard");
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (exitToastTimer) clearTimeout(exitToastTimer);
+    };
+  }, []);
+
   useEffect(() => {
     // 접속하자마자 기본 Turso DB와 자동 연결 및 초기화 수행
     const db = getClientDb();
@@ -45,6 +112,10 @@ export default function Home() {
   }, [loadSettings]);
 
   const handleTabChange = (tab: string) => {
+    if (tab === activeTab) return;
+    if (typeof window !== "undefined") {
+      window.history.pushState({ tab }, "", "#" + tab);
+    }
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -129,6 +200,12 @@ export default function Home() {
           </p>
         </div>
       </footer>
+      {/* 모바일 뒤로가기 종료 방지 안내 토스트 */}
+      {showExitToast && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-6 py-3.5 rounded-full shadow-2xl text-base font-bold flex items-center gap-2 border border-slate-700">
+          <span>&apos;뒤로 가기&apos;를 한 번 더 누르면 종료됩니다.</span>
+        </div>
+      )}
     </div>
   );
 }

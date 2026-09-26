@@ -63,6 +63,22 @@ export function SmartOrderImportView({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
+  // 모바일 뒤로가기 시 검토(review) 화면에서 입력(input) 화면으로 자연스럽게 복귀
+  React.useEffect(() => {
+    if (step === "review") {
+      window.history.pushState({ tab: "smart-import", subStep: "review" }, "", "#smart-import-review");
+    }
+
+    const handleSubPop = (e: PopStateEvent) => {
+      if (e.state?.subStep !== "review" && (step === "review" || step === "analyzing")) {
+        setStep("input");
+      }
+    };
+
+    window.addEventListener("popstate", handleSubPop);
+    return () => window.removeEventListener("popstate", handleSubPop);
+  }, [step]);
+
   // 1. 텍스트 직접 분석 실행
   const handleAnalyzeText = async (textToAnalyze?: string) => {
     const raw = textToAnalyze !== undefined ? textToAnalyze : textInput;
