@@ -404,14 +404,20 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
                           <span className="text-2xl font-black text-slate-900">
                             {ord.customer_name}
                           </span>
-                        <div className="inline-flex items-center text-base font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md">
-                          <PhoneCallLink
-                            phone={ord.customer_phone}
-                            name={ord.customer_name}
-                            showIcon
-                            className="text-emerald-800 font-bold hover:underline"
-                          />
-                        </div>
+                        {ord.customer_phone ? (
+                          <div className="inline-flex items-center text-base font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md">
+                            <PhoneCallLink
+                              phone={ord.customer_phone}
+                              name={ord.customer_name}
+                              showIcon
+                              className="text-emerald-800 font-bold hover:underline"
+                            />
+                          </div>
+                        ) : !isEvent ? (
+                          <div className="inline-flex items-center text-sm text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                            연락처 없음
+                          </div>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => handleOpenOrderShare(ord)}
@@ -438,9 +444,15 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
                           .join("  /  ")}
                       </div>
 
-                      <div className="text-lg text-slate-800 font-medium">
-                        주소: {ord.shipping_address} {ord.shipping_address_detail}
-                      </div>
+                      {isEvent ? (
+                        <div className="text-base text-purple-900 font-bold bg-purple-50/80 border border-purple-200 rounded-lg px-3 py-1.5 inline-block">
+                          🎪 {ord.shipping_address ? `납품장소: ${ord.shipping_address} ${ord.shipping_address_detail || ""}` : "행사 현장 직접 납품 (택배 발송 없음)"}
+                        </div>
+                      ) : (
+                        <div className="text-lg text-slate-800 font-medium">
+                          주소: {ord.shipping_address} {ord.shipping_address_detail}
+                        </div>
+                      )}
 
                       {ord.memo && (
                         <div className="text-base font-bold text-rose-700">

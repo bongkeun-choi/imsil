@@ -603,7 +603,11 @@ export function DashboardView({
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">{ord.shipping_address} {ord.shipping_address_detail}</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {isEvent
+                    ? (ord.shipping_address ? `납품위치: ${ord.shipping_address}` : "🎪 행사 현장 직접 납품 (택배 없음)")
+                    : `${ord.shipping_address || "주소 미입력"} ${ord.shipping_address_detail || ""}`.trim()}
+                </div>
                 {/* 상태 + 버튼 행 - 한 줄 유지 */}
                 <div className="flex items-center gap-1.5 mt-2 overflow-x-auto whitespace-nowrap">
                   <span className={`shrink-0 px-2 py-0.5 text-xs font-bold ${

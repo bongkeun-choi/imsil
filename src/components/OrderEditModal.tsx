@@ -130,10 +130,12 @@ export function OrderEditModal({
   // 1. 주문 수정 저장
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return alert("고객 성함을 입력해 주세요.");
-    if (!phone.trim()) return alert("전화번호를 입력해 주세요.");
-    if (!address.trim()) return alert("배송지 주소를 입력해 주세요.");
+    if (!name.trim()) return alert(isEvent ? "납품처 / 수령처 명칭을 입력해 주세요." : "고객 성함을 입력해 주세요.");
+    if (!isEvent && !phone.trim()) return alert("전화번호를 입력해 주세요.");
+    if (!isEvent && !address.trim()) return alert("배송지 주소를 입력해 주세요.");
     if (qty20kg < 1) return alert("수량을 1박스 이상 지정해 주세요.");
+
+    const finalAddress = address.trim() || (isEvent ? "행사 현장 납품 (택배 없음)" : "");
 
     setIsSaving(true);
     try {
@@ -142,7 +144,7 @@ export function OrderEditModal({
         customerName: name.trim(),
         customerPhone: phone.trim(),
         shippingDate: shippingDate,
-        shippingAddress: address.trim(),
+        shippingAddress: finalAddress,
         shippingAddressDetail: addressDetail.trim(),
         orderType: isEvent ? "EVENT" : "NORMAL",
         eventName: isEvent ? (eventName.trim() || "임실 김치 축제") : null,
@@ -302,67 +304,91 @@ export function OrderEditModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-base font-bold text-slate-900 mb-1">
-                고객 성함 (받는 분) <span className="text-red-600">*</span>
+                {isEvent ? (
+                  <span>납품처 / 수령처 명칭 <span className="text-red-600">*</span></span>
+                ) : (
+                  <span>고객 성함 (받는 분) <span className="text-red-600">*</span></span>
+                )}
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                placeholder={isEvent ? "예: 축제 본부석, 체험관" : "예: 홍길동"}
+                className={`w-full text-lg font-bold border-2 rounded-xl px-3.5 py-2.5 focus:outline-hidden ${
+                  isEvent
+                    ? "border-purple-300 focus:border-purple-600 bg-white"
+                    : "border-slate-300 focus:border-emerald-600"
+                }`}
                 required
               />
             </div>
             <div>
-              <label className="block text-base font-bold text-slate-900 mb-1">
-                전화번호 <span className="text-red-600">*</span>
+              <label className="block text-base font-bold text-slate-900 mb-1 flex items-center justify-between">
+                <span>{isEvent ? "현장 연락처" : "전화번호"} {!isEvent && <span className="text-red-600">*</span>}</span>
+                {isEvent && <span className="text-xs font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.2 rounded">생략 가능</span>}
               </label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(formatPhone(e.target.value))}
+                placeholder={isEvent ? "예: 010-0000-0000 (선택)" : "예: 010-1234-5678"}
                 className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
-                required
+                required={!isEvent}
               />
             </div>
           </div>
 
           {/* 택배 도착 희망일 선택 */}
-          <div className="bg-emerald-50/70 border-2 border-emerald-400 rounded-2xl p-4 space-y-2">
+          <div className={`border-2 rounded-2xl p-4 space-y-2 ${
+            isEvent ? "bg-purple-50/70 border-purple-300" : "bg-emerald-50/70 border-emerald-400"
+          }`}>
             <div className="flex justify-between items-center">
               <label className="text-base font-black text-slate-900">
-                택배 도착 희망일 (배추 받는 날) <span className="text-red-600">*</span>
+                {isEvent ? "현장 납품 희망일" : "택배 도착 희망일 (배추 받는 날)"} <span className="text-red-600">*</span>
               </label>
-              <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                소비자 수령 기준
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                isEvent ? "text-purple-900 bg-purple-100" : "text-emerald-800 bg-emerald-100"
+              }`}>
+                {isEvent ? "행사 현장 납품 기준" : "소비자 수령 기준"}
               </span>
             </div>
             <input
               type="date"
               value={shippingDate}
               onChange={(e) => setShippingDate(e.target.value)}
-              className="w-full text-xl font-black border-2 border-emerald-500 rounded-xl px-3.5 py-2.5 focus:border-emerald-700 bg-white"
+              className={`w-full text-xl font-black border-2 rounded-xl px-3.5 py-2.5 bg-white ${
+                isEvent ? "border-purple-400 focus:border-purple-600" : "border-emerald-500 focus:border-emerald-700"
+              }`}
               required
             />
           </div>
 
-          {/* 배송 주소 */}
+          {/* 배송 주소 / 납품 장소 */}
           <div className="space-y-2">
-            <label className="block text-base font-bold text-slate-900 mb-0.5">
-              배송지 주소 <span className="text-red-600">*</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-base font-bold text-slate-900 mb-0.5">
+                {isEvent ? "납품 장소 / 부스 위치" : "배송지 주소"} {!isEvent && <span className="text-red-600">*</span>}
+              </label>
+              {isEvent && (
+                <span className="text-xs font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                  생략 가능 (행사 현장 직납)
+                </span>
+              )}
+            </div>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="기본 도로명/지번 주소"
+              placeholder={isEvent ? "예: 축제장 종합안내소 옆 (선택/불필요 시 비워두셔도 됩니다)" : "기본 도로명/지번 주소"}
               className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
-              required
+              required={!isEvent}
             />
             <input
               type="text"
               value={addressDetail}
               onChange={(e) => setAddressDetail(e.target.value)}
-              placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
+              placeholder={isEvent ? "상세 위치 메모 (선택)" : "동/호수, 마을이름 등 상세 주소 (선택)"}
               className="w-full text-base border-2 border-slate-200 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
             />
           </div>

@@ -98,8 +98,8 @@ export function PhoneCallLink({
     }
   };
 
-  if (!phone) {
-    return <span className="text-slate-400">-</span>;
+  if (!phone || !cleanPhone) {
+    return <span className="text-slate-400 font-normal text-xs">연락처 없음</span>;
   }
 
   return (

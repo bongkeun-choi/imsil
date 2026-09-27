@@ -676,7 +676,9 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                       />
                       <span className="text-sm font-black text-slate-900 ml-auto stat-number">{formatPrice(ord.total_amount)}</span>
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{ord.shipping_address}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {isEvent ? (ord.shipping_address ? `납품위치: ${ord.shipping_address}` : "🎪 행사 현장 직접 납품 (택배 없음)") : (ord.shipping_address || "주소 미입력")}
+                    </div>
                     {/* 상태 + 버튼 행 - 한 줄 유지 */}
                     <div className="flex items-center gap-1.5 mt-2 overflow-x-auto whitespace-nowrap">
                       <span className={`shrink-0 px-2 py-0.5 text-xs font-bold ${
@@ -911,8 +913,8 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                   {/* 배송지 & 품목 요약 */}
                   <div className="text-sm md:text-base text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
                     <div className="font-semibold">
-                      <span className="text-slate-500 font-normal mr-1.5">배송지:</span>
-                      {ord.shipping_address || "주소 미입력"}
+                      <span className="text-slate-500 font-normal mr-1.5">{isEvent ? "납품장소:" : "배송지:"}</span>
+                      {isEvent ? (ord.shipping_address || "🎪 행사 현장 직접 납품 (택배 없음)") : (ord.shipping_address || "주소 미입력")}
                     </div>
                     {ord.items_summary && (
                       <div className="mt-1 font-bold text-emerald-900">

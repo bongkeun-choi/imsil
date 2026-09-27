@@ -287,14 +287,14 @@ export function NewOrderView({
     e.preventDefault();
 
     if (!name.trim()) {
-      alert("고객 이름을 입력해 주세요.");
+      alert(isEvent ? "납품처 / 수령처 이름을 입력해 주세요." : "고객 이름을 입력해 주세요.");
       return;
     }
-    if (!phone.trim()) {
+    if (!isEvent && !phone.trim()) {
       alert("전화번호를 입력해 주세요.");
       return;
     }
-    if (!address.trim()) {
+    if (!isEvent && !address.trim()) {
       alert("배송지 주소를 입력해 주세요.");
       return;
     }
@@ -313,6 +313,8 @@ export function NewOrderView({
       },
     ];
 
+    const finalAddress = address.trim() || (isEvent ? "행사 현장 납품 (택배 없음)" : "");
+
     setIsSubmitting(true);
     try {
       let createdOrderNo = "";
@@ -322,7 +324,7 @@ export function NewOrderView({
           import_id: analysisResult.import_id,
           customer_name: name.trim(),
           customer_phone: phone.trim(),
-          shipping_address: address.trim(),
+          shipping_address: finalAddress,
           shipping_address_detail: addressDetail.trim(),
           shipping_date: shippingDate,
           order_type: isEvent ? "EVENT" : "NORMAL",
@@ -337,7 +339,7 @@ export function NewOrderView({
         const ordRes = await createOrderService({
           name: name.trim(),
           phone: phone.trim(),
-          address: address.trim(),
+          address: finalAddress,
           address_detail: addressDetail.trim(),
           shipping_date: shippingDate,
           order_type: isEvent ? "EVENT" : "NORMAL",
@@ -637,102 +639,170 @@ export function NewOrderView({
             )}
           </div>
 
-          {/* 고객명 & 연락처 */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-lg font-bold text-slate-900">
-                  전화번호 <span className="text-red-600">*</span>
+          {/* 고객명 & 연락처 & 주소 영역 (일반 택배 vs 행사 납품 분기) */}
+          {isEvent ? (
+            <div className="space-y-4">
+              {/* 행사 납품처 이름 입력 */}
+              <div>
+                <label className="block text-lg font-black text-purple-950 mb-1.5 flex items-center justify-between">
+                  <span>납품처 / 수령처 (행사 담당부서) <span className="text-red-600">*</span></span>
+                  <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md">
+                    행사 납품처 필수
+                  </span>
                 </label>
-                <button
-                  type="button"
-                  onClick={handlePickContactForOrder}
-                  className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-300 cursor-pointer active:scale-95 transition-all"
-                  title="스마트폰 주소록에서 연락처 선택"
-                >
-                  <Smartphone className="w-4 h-4 text-emerald-700" />
-                  <span>핸드폰 연락처 선택</span>
-                </button>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="예: 축제 본부석, 김치 체험관, 1호 부스 등"
+                  className="w-full text-xl font-bold border-2 border-purple-400 rounded-xl px-4 py-3.5 focus:border-purple-600 focus:outline-hidden bg-white shadow-xs"
+                  required
+                />
               </div>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(formatPhone(e.target.value))}
-                placeholder="예: 010-1234-5678"
-                className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
-                required
-              />
 
-              {/* 기존 고객 자동완성 드롭다운 */}
-              {customerSuggestions.length > 0 && (
-                <div className="mt-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-3 space-y-2">
-                  <div className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4" />
-                    <span>기존 고객 터치 시 자동 입력:</span>
-                  </div>
-                  <div className="space-y-1.5">
-                    {customerSuggestions.map((cust) => (
-                      <button
-                        key={cust.id}
-                        type="button"
-                        onClick={() => selectExistingCustomer(cust)}
-                        className="w-full text-left bg-white hover:bg-emerald-100 p-3 rounded-lg border border-emerald-200 cursor-pointer flex justify-between items-center transition-colors"
-                      >
-                        <div>
-                          <span className="text-lg font-bold text-slate-900 mr-2">
-                            {cust.name}
-                          </span>
-                          <span className="text-sm text-slate-600">{cust.phone}</span>
-                          <div className="text-xs text-slate-500 truncate">
-                            {cust.address} {cust.address_detail}
-                          </div>
-                        </div>
-                        <span className="bg-emerald-700 text-white text-xs font-bold px-2.5 py-1 rounded-sm">
-                          선택
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+              {/* 행사 축제용 연락처/주소 불필요 안내 및 선택 입력 박스 */}
+              <div className="bg-purple-50/80 border-2 border-purple-300 rounded-2xl p-4.5 text-purple-950 space-y-2.5">
+                <div className="flex items-center gap-2 font-black text-base md:text-lg text-purple-900">
+                  <span className="text-xl">🎪</span>
+                  <span>행사 현장 직납 (전화번호 및 택배 주소 입력 필요 없음)</span>
                 </div>
-              )}
-            </div>
+                <p className="text-xs md:text-sm text-purple-800 font-semibold leading-relaxed">
+                  행사·축제 물량은 현장으로 직접 운송되므로 일반 고객 연락처나 택배 배송지 주소를 입력하지 않고 바로 등록하실 수 있습니다.
+                </p>
 
-            <div>
-              <label className="block text-lg font-bold text-slate-900 mb-1.5">
-                고객 이름 (받는 분) <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="예: 홍길동"
-                className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden"
-                required
-              />
+                <details className="pt-1">
+                  <summary className="text-xs md:text-sm font-black text-purple-700 hover:text-purple-900 cursor-pointer select-none">
+                    + 필요 시 현장 담당자 연락처나 납품 위치 메모 적기 (선택사항)
+                  </summary>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-purple-200">
+                    <div>
+                      <label className="block text-xs font-bold text-purple-900 mb-1">
+                        현장 담당자 연락처 (선택)
+                      </label>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(formatPhone(e.target.value))}
+                        placeholder="예: 010-0000-0000"
+                        className="w-full text-base font-bold border border-purple-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:border-purple-600 focus:outline-hidden"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-purple-900 mb-1">
+                        현장 납품 위치 / 부스 메모 (선택)
+                      </label>
+                      <input
+                        type="text"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="예: 종합안내소 옆 천막"
+                        className="w-full text-base font-bold border border-purple-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:border-purple-600 focus:outline-hidden"
+                      />
+                    </div>
+                  </div>
+                </details>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 일반 고객명 & 연락처 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-lg font-bold text-slate-900">
+                      전화번호 <span className="text-red-600">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handlePickContactForOrder}
+                      className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-300 cursor-pointer active:scale-95 transition-all"
+                      title="스마트폰 주소록에서 연락처 선택"
+                    >
+                      <Smartphone className="w-4 h-4 text-emerald-700" />
+                      <span>핸드폰 연락처 선택</span>
+                    </button>
+                  </div>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhone(e.target.value))}
+                    placeholder="예: 010-1234-5678"
+                    className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
+                    required
+                  />
 
-          {/* 배송지 주소 */}
-          <div>
-            <label className="block text-lg font-bold text-slate-900 mb-1.5">
-              배송 주소 <span className="text-red-600">*</span>
-            </label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="시·군·구·도로명 또는 지번 주소"
-              className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 mb-2 focus:border-emerald-600 focus:outline-hidden"
-              required
-            />
-            <input
-              type="text"
-              value={addressDetail}
-              onChange={(e) => setAddressDetail(e.target.value)}
-              placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
-              className="w-full text-base border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-600 focus:outline-hidden"
-            />
-          </div>
+                  {/* 기존 고객 자동완성 드롭다운 */}
+                  {customerSuggestions.length > 0 && (
+                    <div className="mt-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-3 space-y-2">
+                      <div className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
+                        <UserCheck className="w-4 h-4" />
+                        <span>기존 고객 터치 시 자동 입력:</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {customerSuggestions.map((cust) => (
+                          <button
+                            key={cust.id}
+                            type="button"
+                            onClick={() => selectExistingCustomer(cust)}
+                            className="w-full text-left bg-white hover:bg-emerald-100 p-3 rounded-lg border border-emerald-200 cursor-pointer flex justify-between items-center transition-colors"
+                          >
+                            <div>
+                              <span className="text-lg font-bold text-slate-900 mr-2">
+                                {cust.name}
+                              </span>
+                              <span className="text-sm text-slate-600">{cust.phone}</span>
+                              <div className="text-xs text-slate-500 truncate">
+                                {cust.address} {cust.address_detail}
+                              </div>
+                            </div>
+                            <span className="bg-emerald-700 text-white text-xs font-bold px-2.5 py-1 rounded-sm">
+                              선택
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-lg font-bold text-slate-900 mb-1.5">
+                    고객 이름 (받는 분) <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="예: 홍길동"
+                    className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* 배송지 주소 */}
+              <div>
+                <label className="block text-lg font-bold text-slate-900 mb-1.5">
+                  배송 주소 <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="시·군·구·도로명 또는 지번 주소"
+                  className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 mb-2 focus:border-emerald-600 focus:outline-hidden"
+                  required
+                />
+                <input
+                  type="text"
+                  value={addressDetail}
+                  onChange={(e) => setAddressDetail(e.target.value)}
+                  placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
+                  className="w-full text-base border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-600 focus:outline-hidden"
+                />
+              </div>
+            </div>
+          )}
 
           {/* 상품 단위 및 수량 선택 (절임배추 20kg 단일 규격) */}
           <div className="border-t border-b border-slate-200 py-6 space-y-4">

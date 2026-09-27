@@ -84,9 +84,15 @@ export function ShipmentPrintModal({
         const isEv = o.order_type === "EVENT" || !!o.event_name;
         // 박스 수량만 합산
         const totalQty = (o.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
-        const addr = [o.shipping_address, o.shipping_address_detail]
+        const rawAddr = [o.shipping_address, o.shipping_address_detail]
           .filter(Boolean)
           .join(" ");
+        const addr = isEv
+          ? (rawAddr || `<span style="color:#7e22ce;font-weight:700;">🎪 행사 현장 직접 납품 (택배 없음)</span>`)
+          : (rawAddr || "-");
+        const phoneCell = isEv
+          ? (o.customer_phone ? o.customer_phone : `<span style="color:#9ca3af;">(생략)</span>`)
+          : (o.customer_phone || "-");
         const rowBg = idx % 2 === 0 ? "#fff" : "#f8fafc";
         const memoCell = o.memo
           ? `<span style="color:#be123c;font-weight:700;">${o.memo}</span>`
@@ -99,7 +105,7 @@ export function ShipmentPrintModal({
               ${o.customer_name}
               ${isEv ? `<span style="display:inline-block;padding:1px 5px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe;border-radius:3px;font-size:11px;font-weight:800;margin-left:4px;">🎪 ${o.event_name || "행사납품"}</span>` : ""}
             </td>
-            <td style="padding:9px 7px;font-size:13px;color:#065f46;font-weight:600;white-space:nowrap;">${o.customer_phone}</td>
+            <td style="padding:9px 7px;font-size:13px;color:#065f46;font-weight:600;white-space:nowrap;">${phoneCell}</td>
             <td style="padding:9px 7px;font-weight:800;color:#064e3b;font-size:15px;text-align:center;">${totalQty}박스</td>
             <td style="padding:9px 7px;font-size:12px;color:#334155;">${addr}</td>
             <td style="padding:9px 7px;font-size:12px;">${memoCell}</td>
@@ -233,9 +239,12 @@ export function ShipmentPrintModal({
           title: `${shopName} 발송명단 (${selectedDate})`,
           text: `${selectedDate} 택배 도착 예정\n수령자 명단: ${orders.length}건 / 절임배추 20kg × ${totalBoxes}박스\n\n` +
             orders.map((o, i) => {
+              const isEv = o.order_type === "EVENT" || !!o.event_name;
               const qty = (o.items || []).reduce((s: number, x: any) => s + (x.quantity || 0), 0);
               const addr = [o.shipping_address, o.shipping_address_detail].filter(Boolean).join(" ");
-              return `${i + 1}. ${o.customer_name} ${o.customer_phone} ${qty}박스 ${addr}${o.memo ? " ["+o.memo+"]" : ""}`;
+              const phoneStr = o.customer_phone ? ` ${o.customer_phone}` : (isEv ? "" : " (연락처없음)");
+              const addrStr = addr ? ` ${addr}` : (isEv ? " [행사직납]" : "");
+              return `${i + 1}. ${isEv ? "🎪 " : ""}${o.customer_name}${phoneStr} ${qty}박스${addrStr}${o.memo ? " ["+o.memo+"]" : ""}`;
             }).join("\n"),
         });
         setShareStatus("idle");

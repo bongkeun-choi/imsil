@@ -193,31 +193,55 @@ export async function createOrderService(data: {
 
   const now = new Date().toISOString();
   const todayStr = format(new Date(), "yyyyMMdd");
-  const cleanPhone = data.phone.replace(/[^0-9]/g, "");
+  const cleanPhone = (data.phone || "").replace(/[^0-9]/g, "");
 
   // 1. 고객 확인 및 등록
   let customerId: number;
-  const existingCustomer = await db.execute({
-    sql: "SELECT id FROM customers WHERE REPLACE(phone, '-', '') = ? LIMIT 1",
-    args: [cleanPhone],
-  });
+  if (cleanPhone) {
+    const existingCustomer = await db.execute({
+      sql: "SELECT id FROM customers WHERE REPLACE(phone, '-', '') = ? LIMIT 1",
+      args: [cleanPhone],
+    });
 
-  if (existingCustomer.rows.length > 0) {
-    customerId = Number(existingCustomer.rows[0].id);
-    await db.execute({
-      sql: `UPDATE customers SET 
-              name = ?, address = COALESCE(?, address), 
-              address_detail = COALESCE(?, address_detail), 
-              updated_at = ? WHERE id = ?`,
-      args: [data.name, data.address, data.address_detail || "", now, customerId],
-    });
+    if (existingCustomer.rows.length > 0) {
+      customerId = Number(existingCustomer.rows[0].id);
+      await db.execute({
+        sql: `UPDATE customers SET 
+                name = ?, address = COALESCE(?, address), 
+                address_detail = COALESCE(?, address_detail), 
+                updated_at = ? WHERE id = ?`,
+        args: [data.name, data.address || "", data.address_detail || "", now, customerId],
+      });
+    } else {
+      const newCustomer = await db.execute({
+        sql: `INSERT INTO customers (name, phone, zipcode, address, address_detail, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [data.name, data.phone || "", data.zipcode || "", data.address || "", data.address_detail || "", now, now],
+      });
+      customerId = Number(newCustomer.lastInsertRowid);
+    }
   } else {
-    const newCustomer = await db.execute({
-      sql: `INSERT INTO customers (name, phone, zipcode, address, address_detail, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [data.name, data.phone, data.zipcode || "", data.address, data.address_detail || "", now, now],
+    // 행사/축제 납품 등 전화번호가 없는 경우 이름으로 고객 확인 또는 신규 등록
+    const existingCustomer = await db.execute({
+      sql: "SELECT id FROM customers WHERE name = ? AND (phone = '' OR phone IS NULL) LIMIT 1",
+      args: [data.name],
     });
-    customerId = Number(newCustomer.lastInsertRowid);
+    if (existingCustomer.rows.length > 0) {
+      customerId = Number(existingCustomer.rows[0].id);
+      if (data.address) {
+        await db.execute({
+          sql: `UPDATE customers SET address = ?, updated_at = ? WHERE id = ?`,
+          args: [data.address, now, customerId],
+        });
+      }
+    } else {
+      const newCustomer = await db.execute({
+        sql: `INSERT INTO customers (name, phone, zipcode, address, address_detail, created_at, updated_at)
+              VALUES (?, '', '', ?, '', ?, ?)`,
+        args: [data.name, data.address || "", now, now],
+      });
+      customerId = Number(newCustomer.lastInsertRowid);
+    }
   }
 
   // 2. 주문번호 생성
@@ -496,23 +520,25 @@ export async function updateOrderDetailService(data: UpdateOrderPayload) {
     ],
   });
 
-  // 2. 고객 정보 동기화
-  const cleanPhone = data.customerPhone.replace(/[^0-9]/g, "");
-  await db.execute({
-    sql: `UPDATE customers SET 
-            name = ?, 
-            address = ?, 
-            address_detail = ?, 
-            updated_at = ?
-          WHERE REPLACE(phone, '-', '') = ?`,
-    args: [
-      data.customerName,
-      data.shippingAddress,
-      data.shippingAddressDetail || "",
-      now,
-      cleanPhone,
-    ],
-  });
+  // 2. 고객 정보 동기화 (전화번호가 있을 때만 동기화)
+  const cleanPhone = (data.customerPhone || "").replace(/[^0-9]/g, "");
+  if (cleanPhone) {
+    await db.execute({
+      sql: `UPDATE customers SET 
+              name = ?, 
+              address = ?, 
+              address_detail = ?, 
+              updated_at = ?
+            WHERE REPLACE(phone, '-', '') = ?`,
+      args: [
+        data.customerName,
+        data.shippingAddress,
+        data.shippingAddressDetail || "",
+        now,
+        cleanPhone,
+      ],
+    });
+  }
 
   // 3. order_items 재등록
   await db.execute({
