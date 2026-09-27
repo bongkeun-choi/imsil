@@ -794,3 +794,133 @@ export async function batchCreateCustomersService(
 
   return { createdCount, updatedCount, total: customersList.length };
 }
+
+// ────────────────────────────────────────────────
+// 장부관리: 전체 판매 주문 리스트 조회 (필터/검색)
+// ────────────────────────────────────────────────
+export async function fetchAllOrdersService(opts: {
+  search?: string;
+  searchType?: "ALL" | "CUSTOMER" | "PHONE" | "ADDRESS";
+  dateFrom?: string;
+  dateTo?: string;
+  paymentStatus?: "ALL" | "PAID" | "UNPAID";
+  orderStatus?: "ALL" | "PENDING" | "PACKED" | "SHIPPED";
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+
+  const {
+    search = "",
+    searchType = "ALL",
+    dateFrom = "",
+    dateTo = "",
+    paymentStatus = "ALL",
+    orderStatus = "ALL",
+    limit = 100,
+    offset = 0,
+  } = opts;
+
+  const args: any[] = [];
+  const wheres: string[] = [];
+
+  if (search.trim()) {
+    const q = search.trim();
+    const cleanQ = q.replace(/-/g, "");
+    if (searchType === "CUSTOMER") {
+      wheres.push("(c.name LIKE ? OR o.customer_name LIKE ?)");
+      args.push(`%${q}%`, `%${q}%`);
+    } else if (searchType === "PHONE") {
+      wheres.push("(REPLACE(c.phone,'-','') LIKE ? OR REPLACE(o.customer_phone,'-','') LIKE ?)");
+      args.push(`%${cleanQ}%`, `%${cleanQ}%`);
+    } else if (searchType === "ADDRESS") {
+      wheres.push("(c.address LIKE ? OR c.address_detail LIKE ? OR o.shipping_address LIKE ?)");
+      args.push(`%${q}%`, `%${q}%`, `%${q}%`);
+    } else {
+      wheres.push(
+        "(c.name LIKE ? OR o.customer_name LIKE ? OR REPLACE(c.phone,'-','') LIKE ? OR REPLACE(o.customer_phone,'-','') LIKE ? OR c.address LIKE ? OR o.shipping_address LIKE ?)"
+      );
+      args.push(`%${q}%`, `%${q}%`, `%${cleanQ}%`, `%${cleanQ}%`, `%${q}%`, `%${q}%`);
+    }
+  }
+  if (dateFrom) { wheres.push("o.shipping_date >= ?"); args.push(dateFrom); }
+  if (dateTo)   { wheres.push("o.shipping_date <= ?"); args.push(dateTo); }
+  if (paymentStatus !== "ALL") { wheres.push("o.payment_status = ?"); args.push(paymentStatus); }
+  if (orderStatus !== "ALL")   { wheres.push("o.order_status = ?"); args.push(orderStatus); }
+
+  const whereClause = wheres.length ? "WHERE " + wheres.join(" AND ") : "";
+
+  const sql = `
+    SELECT
+      o.id, o.order_no, o.shipping_date, o.payment_status, o.order_status,
+      o.total_amount, s.tracking_no, o.memo,
+      c.id as customer_id, c.name as customer_name, c.phone as customer_phone,
+      c.address as shipping_address, c.address_detail as shipping_address_detail,
+      (SELECT GROUP_CONCAT(p.name||' '||oi.quantity||'박스', ', ')
+       FROM order_items oi JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = o.id) as items_summary,
+      (SELECT SUM(oi.quantity)
+       FROM order_items oi WHERE oi.order_id = o.id) as total_boxes
+    FROM orders o
+    LEFT JOIN customers c ON c.id = o.customer_id
+    LEFT JOIN shipments s ON s.order_id = o.id
+    ${whereClause}
+    ORDER BY o.shipping_date DESC, o.id DESC
+    LIMIT ? OFFSET ?
+  `;
+  args.push(limit, offset);
+
+  const countSql = `
+    SELECT COUNT(*) as cnt, SUM(o.total_amount) as total_sales,
+           SUM(CASE WHEN o.payment_status='PAID' THEN o.total_amount ELSE 0 END) as paid_sales,
+           SUM(CASE WHEN o.payment_status='UNPAID' THEN o.total_amount ELSE 0 END) as unpaid_sales
+    FROM orders o
+    LEFT JOIN customers c ON c.id = o.customer_id
+    ${whereClause}
+  `;
+  const countArgs = args.slice(0, args.length - 2); // limit/offset 제외
+
+  const [rows, countRows] = await Promise.all([
+    db.execute({ sql, args }),
+    db.execute({ sql: countSql, args: countArgs }),
+  ]);
+
+  const stat = countRows.rows[0] || {};
+  return {
+    orders: rows.rows,
+    total: Number(stat.cnt) || 0,
+    totalSales: Number(stat.total_sales) || 0,
+    paidSales: Number(stat.paid_sales) || 0,
+    unpaidSales: Number(stat.unpaid_sales) || 0,
+  };
+}
+
+// 고객 수정
+export async function updateCustomerService(data: {
+  id: number;
+  name: string;
+  phone: string;
+  address?: string;
+  address_detail?: string;
+  memo?: string;
+}) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  await db.execute({
+    sql: `UPDATE customers SET name=?, phone=?, address=?, address_detail=?, memo=? WHERE id=?`,
+    args: [data.name, data.phone, data.address || "", data.address_detail || "", data.memo || "", data.id],
+  });
+}
+
+// 고객 삭제 (주문이 없는 경우만)
+export async function deleteCustomerService(id: number) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const check = await db.execute({ sql: `SELECT COUNT(*) as cnt FROM orders WHERE customer_id=?`, args: [id] });
+  if (Number(check.rows[0]?.cnt) > 0) {
+    throw new Error("주문 이력이 있는 고객은 삭제할 수 없습니다.");
+  }
+  await db.execute({ sql: `DELETE FROM customers WHERE id=?`, args: [id] });
+}
+

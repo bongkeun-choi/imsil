@@ -22,12 +22,12 @@ export function Header({
   onExitClick,
 }: HeaderProps) {
   const navItems = [
-    { id: "dashboard", label: "오늘 도착·발송 현황" },
-    { id: "calendar", label: "택배 도착 달력" },
+    { id: "dashboard", label: "당일현황" },
+    { id: "calendar", label: "주문일정" },
     { id: "new-order", label: "주문 등록" },
     { id: "shipments", label: "발송·운송장 관리" },
-    { id: "customers", label: "고객 장부" },
-    { id: "settings", label: "농가 정보·설정" },
+    { id: "ledger", label: "관리" },
+    { id: "settings", label: "설정" },
   ];
 
   return (

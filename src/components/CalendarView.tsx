@@ -37,6 +37,8 @@ import { OrderShareModal } from "@/components/OrderShareModal";
 import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
 import { useBackButtonModal } from "@/lib/useBackButtonModal";
+import { PhoneCallLink } from "@/components/PhoneCallLink";
+import { parseExtraPhones } from "@/lib/orderShareMessage";
 
 interface CalendarViewProps {
   onSelectDateForNewOrder: (dateStr: string) => void;
@@ -78,6 +80,8 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
       memo: ord.memo || "",
       shopName: settings?.shop_name || "임실참배추농원",
       shopPhone: settings?.shop_phone || settings?.phone || "010-0000-0000",
+      extraPhones: parseExtraPhones(settings?.extra_phones),
+      shareMessageTemplate: settings?.share_message_template,
       bankName: settings?.bank_name || "농협",
       bankAccount: settings?.bank_account || "",
       ownerName: settings?.owner_name || "",
@@ -267,7 +271,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
           <div className="flex items-center gap-3">
             <CalendarIcon className="w-7 h-7 text-emerald-700" />
             <h1 className="text-2xl md:text-3xl font-black text-slate-900">
-              {format(currentDate, "yyyy년 M월")} 택배 도착 달력
+              {format(currentDate, "yyyy년 M월")} 주문일정
               {viewMode === "week" && ` (주간)`}
             </h1>
 
@@ -295,7 +299,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
             </div>
           </div>
           <p className="text-xs md:text-sm font-bold text-emerald-800 mt-1">
-            고객 배추 수령(도착) 기준 일정입니다. (농가 발송·포장은 도착 전날 D-1 진행)
+            고객 배추 수령(도착) 기준 일정입니다.
           </p>
         </div>
 
@@ -404,9 +408,6 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                           도착 {summary.orderCount}건
                         </div>
                       )}
-                      <div className="text-[9px] md:text-[11px] text-slate-500 font-bold hidden sm:block">
-                        (발송: D-1)
-                      </div>
                     </div>
                   ) : (
                     <div className="text-[10px] md:text-xs text-slate-300 font-medium py-1 hidden sm:block">
@@ -479,9 +480,6 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                         </div>
                         <div className="text-2xl font-black text-emerald-950">
                           {summary.orderCount}건
-                        </div>
-                        <div className="text-[11px] text-emerald-700 font-bold">
-                          (발송일: 전날 D-1)
                         </div>
                       </div>
 
@@ -563,72 +561,56 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
             {selectedDaySummary.orders.map((ord: any) => (
               <div
                 key={ord.id}
-                className="py-4 flex flex-wrap items-center justify-between gap-3"
+                className="py-3 border-b border-slate-200 last:border-0"
               >
-                <div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-extrabold text-slate-900">
-                      {ord.customer_name}
-                    </span>
-                    <a
-                      href={`tel:${ord.customer_phone.replace(/[^0-9]/g, "")}`}
-                      className="text-base text-emerald-800 font-bold hover:underline inline-flex items-center gap-1"
-                    >
-                      <Phone className="w-4 h-4" />
-                      <span>{ord.customer_phone}</span>
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenOrderShare(ord)}
-                      className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors"
-                      title="카톡·문자 안내장 보내기"
-                    >
-                      <Share2 className="w-3.5 h-3.5 text-amber-700" />
-                      <span>문자·카톡</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenOrderEdit(ord)}
-                      className="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors"
-                      title="주문 정보 수정"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 text-blue-700" />
-                      <span>수정</span>
-                    </button>
-                  </div>
-                  <div className="text-base text-slate-700 mt-1">
-                    배송지: {ord.shipping_address}
-                  </div>
+                {/* 고객 정보 행 */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-lg font-extrabold text-slate-900">{ord.customer_name}</span>
+                  <PhoneCallLink
+                    phone={ord.customer_phone}
+                    name={ord.customer_name}
+                    showIcon
+                    className="text-sm text-emerald-800 font-bold hover:underline inline-flex items-center gap-1"
+                  />
+                  <span className="text-sm font-black text-slate-900 ml-auto stat-number">{formatPrice(ord.total_amount)}</span>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-bold ${
-                      ord.payment_status === "PAID"
-                        ? "bg-blue-100 text-blue-900 border border-blue-300"
-                        : "bg-red-100 text-red-900 border border-red-300"
-                    }`}
-                  >
+                <div className="text-xs text-slate-500 mt-0.5">{ord.shipping_address}</div>
+                {/* 상태 + 버튼 행 - 한 줄 유지 */}
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto">
+                  <span className={`shrink-0 px-2 py-0.5 text-xs font-bold ${
+                    ord.payment_status === "PAID"
+                      ? "bg-blue-100 text-blue-900 border border-blue-300"
+                      : "bg-red-100 text-red-900 border border-red-300"
+                  }`}>
                     {ord.payment_status === "PAID" ? "입금완료" : "미입금"}
                   </span>
-                  <span
-                    className={`px-3 py-1 rounded-full text-sm font-bold ${
-                      ord.order_status === "SHIPPED"
-                        ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                        : ord.order_status === "PACKED"
-                        ? "bg-amber-100 text-amber-900 border border-amber-300"
-                        : "bg-slate-100 text-slate-800 border border-slate-300"
-                    }`}
-                  >
-                    {ord.order_status === "SHIPPED"
-                      ? "발송완료"
+                  <span className={`shrink-0 px-2 py-0.5 text-xs font-bold ${
+                    ord.order_status === "SHIPPED"
+                      ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
                       : ord.order_status === "PACKED"
-                      ? "포장완료"
-                      : "포장대기"}
+                      ? "bg-amber-100 text-amber-900 border border-amber-300"
+                      : "bg-slate-100 text-slate-800 border border-slate-300"
+                  }`}>
+                    {ord.order_status === "SHIPPED" ? "발송완료" : ord.order_status === "PACKED" ? "포장완료" : "포장대기"}
                   </span>
-                  <span className="text-base font-black text-slate-900 stat-number">
-                    {formatPrice(ord.total_amount)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenOrderShare(ord)}
+                    className="shrink-0 inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 text-xs font-bold cursor-pointer transition-colors whitespace-nowrap"
+                    title="카톡·문자 안내장 보내기"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-amber-700" />
+                    <span>문자·카톡</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenOrderEdit(ord)}
+                    className="shrink-0 inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 px-2 py-0.5 text-xs font-bold cursor-pointer transition-colors whitespace-nowrap"
+                    title="주문 정보 수정"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-blue-700" />
+                    <span>수정</span>
+                  </button>
                 </div>
               </div>
             ))}
@@ -665,9 +647,6 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                   <span className="bg-slate-800 text-amber-300 px-2.5 py-0.5 rounded-full border border-slate-700">
                     총 {selectedDaySummary.totalWeight}kg
                   </span>
-                  <span className="bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700">
-                    (농가 발송: 전날 D-1)
-                  </span>
                 </div>
               </div>
 
@@ -694,15 +673,17 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                       <span className="text-lg md:text-xl font-black text-slate-900">
                         {ord.customer_name}
                       </span>
-                      <a
-                        href={`tel:${ord.customer_phone?.replace(/[^0-9]/g, "")}`}
+                      <div
                         onClick={(e) => e.stopPropagation()}
-                        className="text-sm md:text-base text-emerald-700 hover:underline font-bold inline-flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200"
-                        title="전화 걸기"
+                        className="text-sm md:text-base text-emerald-700 font-bold inline-flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200"
                       >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>{ord.customer_phone}</span>
-                      </a>
+                        <PhoneCallLink
+                          phone={ord.customer_phone}
+                          name={ord.customer_name}
+                          showIcon
+                          className="text-emerald-700 font-bold hover:underline"
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={(e) => {

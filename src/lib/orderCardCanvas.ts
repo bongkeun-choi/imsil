@@ -5,6 +5,8 @@
  * 카카오톡 / 문자 / 다운로드용 프리미엄 이미지 카드를 생성합니다.
  */
 
+import { ExtraPhone } from "@/lib/orderShareMessage";
+
 export interface OrderCardData {
   orderNo: string;
   customerName: string;
@@ -18,6 +20,8 @@ export interface OrderCardData {
   memo?: string;
   shopName: string;
   shopPhone: string;
+  extraPhones?: ExtraPhone[];
+  shareMessageTemplate?: string;
   bankName: string;
   bankAccount: string;
   ownerName: string;
@@ -188,6 +192,14 @@ function renderJangmonimTemplateCard(
   ctx.font = `900 26px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0F172A";
   ctx.fillText(phoneText, 258, 695);
+
+  if (data.extraPhones && data.extraPhones.length > 0) {
+    const extra = data.extraPhones[0];
+    const phoneWidth = ctx.measureText(phoneText).width;
+    ctx.font = `700 16px ${FONT_FAMILY}`;
+    ctx.fillStyle = "#475569";
+    ctx.fillText(`(${extra.label}: ${extra.phone})`, 258 + phoneWidth + 10, 695);
+  }
 
   // ==========================================
   // [5행] 계좌번호: 은행명 계좌번호 / (예금주: OOO) (원래 위치 y=750)

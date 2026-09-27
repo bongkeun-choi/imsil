@@ -3,7 +3,31 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+
+  /* 테두리 라운드 최소화 (사용자 요청: 거의 없게) */
+  --radius-sm:   2px;
+  --radius:      3px;
+  --radius-md:   3px;
+  --radius-lg:   4px;
+  --radius-xl:   5px;
+  --radius-2xl:  6px;
+  --radius-3xl:  8px;
+  --radius-full: 4px; /* pill/badge 형태도 거의 사각형으로 */
 }
+
+/* Tailwind v4 rounded 유틸리티 전역 override */
+*, *::before, *::after {
+  --tw-rounded: 2px;
+}
+.rounded-none   { border-radius: 0 !important; }
+.rounded-sm     { border-radius: 2px !important; }
+.rounded        { border-radius: 3px !important; }
+.rounded-md     { border-radius: 3px !important; }
+.rounded-lg     { border-radius: 4px !important; }
+.rounded-xl     { border-radius: 5px !important; }
+.rounded-2xl    { border-radius: 6px !important; }
+.rounded-3xl    { border-radius: 8px !important; }
+.rounded-full   { border-radius: 4px !important; }
 
 body {
   background-color: var(--background);

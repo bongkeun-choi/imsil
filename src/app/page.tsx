@@ -6,7 +6,7 @@ import { DashboardView } from "@/components/DashboardView";
 import { CalendarView } from "@/components/CalendarView";
 import { NewOrderView } from "@/components/NewOrderView";
 import { ShipmentView } from "@/components/ShipmentView";
-import { CustomerView } from "@/components/CustomerView";
+import { LedgerView } from "@/components/LedgerView";
 import { SettingsView } from "@/components/SettingsView";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { MobileAppBanner } from "@/components/MobileAppBanner";
@@ -19,7 +19,7 @@ const VALID_TABS = [
   "calendar",
   "new-order",
   "shipments",
-  "customers",
+  "ledger",
   "settings",
 ];
 
@@ -33,6 +33,8 @@ export default function Home() {
   const [settings, setSettings] = useState<Record<string, string>>({
     shop_name: "임실 절임배추",
     shop_phone: "010-0000-0000",
+    extra_phones: "[]",
+    share_message_template: "",
     bank_name: "농협",
     bank_account: "351-0000-0000-00",
     owner_name: "대표자",
@@ -217,14 +219,15 @@ export default function Home() {
           <ShipmentView settings={settings} onRequestConfig={() => {}} />
         )}
 
-        {/* 5. 단골 고객 장부 */}
-        {activeTab === "customers" && <CustomerView onRequestConfig={() => {}} />}
+        {/* 5. 장부 관리 (판매 리스트 + 고객 리스트) */}
+        {activeTab === "ledger" && (
+          <LedgerView settings={settings} onRequestConfig={() => {}} />
+        )}  
 
-        {/* 6. 농가 정보 및 단가 설정 */}
+        {/* 6. 설정 */}
         {activeTab === "settings" && (
           <SettingsView
             onSettingsUpdated={loadSettings}
-            onExitClick={() => setShowExitConfirm(true)}
           />
         )}
       </main>

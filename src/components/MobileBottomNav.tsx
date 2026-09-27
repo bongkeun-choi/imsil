@@ -7,7 +7,7 @@ import {
   PlusCircle,
   Truck,
   Settings,
-  Users,
+  BookOpen,
 } from "lucide-react";
 
 interface MobileBottomNavProps {
@@ -29,7 +29,7 @@ export function MobileBottomNav({
     },
     {
       id: "calendar",
-      label: "도착달력",
+      label: "주문일정",
       icon: Calendar,
     },
     {
@@ -44,9 +44,9 @@ export function MobileBottomNav({
       icon: Truck,
     },
     {
-      id: "settings",
-      label: "설정·더보기",
-      icon: Settings,
+      id: "ledger",
+      label: "관리",
+      icon: BookOpen,
     },
   ];
 

@@ -1,4 +1,5 @@
 import { createClient, Client } from "@libsql/client/web";
+import { DEFAULT_SHARE_MESSAGE_TEMPLATE } from "./orderShareMessage";
 
 export interface TursoConfig {
   url: string;
@@ -225,6 +226,8 @@ export async function initClientTables(client: Client): Promise<void> {
     const defaultSettings = [
       { key: "shop_name", value: "임실 절임배추" },
       { key: "shop_phone", value: "010-0000-0000" },
+      { key: "extra_phones", value: "[]" },
+      { key: "share_message_template", value: DEFAULT_SHARE_MESSAGE_TEMPLATE },
       { key: "bank_name", value: "농협" },
       { key: "bank_account", value: "351-0000-0000-00" },
       { key: "owner_name", value: "대표자" },

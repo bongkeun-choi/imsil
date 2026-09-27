@@ -12,10 +12,11 @@ import {
   Share2,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatPhone } from "@/lib/utils";
 import { updateOrderDetailService, deleteOrderService } from "@/lib/services";
 import { OrderCardData } from "@/lib/orderCardCanvas";
 import { useBackButtonModal } from "@/lib/useBackButtonModal";
+import { parseExtraPhones } from "@/lib/orderShareMessage";
 
 interface OrderEditModalProps {
   order: any;
@@ -61,7 +62,7 @@ export function OrderEditModal({
     if (!isOpen || !order) return;
 
     setName(order.customer_name || "");
-    setPhone(order.customer_phone || "");
+    setPhone(formatPhone(order.customer_phone || ""));
     setAddress(order.shipping_address || "");
     setAddressDetail(order.shipping_address_detail || "");
     setShippingDate(order.shipping_date || format(new Date(), "yyyy-MM-dd"));
@@ -119,17 +120,6 @@ export function OrderEditModal({
     onClose();
   };
 
-  const getDispatchDateStr = (dateStr: string) => {
-    if (!dateStr) return "";
-    try {
-      const arr = new Date(dateStr + "T00:00:00");
-      if (isNaN(arr.getTime())) return "";
-      return format(addDays(arr, -1), "yyyy년 M월 d일 (EEE)");
-    } catch {
-      return "";
-    }
-  };
-
   const totalAmount = qty20kg * unitPrice;
 
   // 1. 주문 수정 저장
@@ -175,6 +165,8 @@ export function OrderEditModal({
         memo: memo.trim(),
         shopName: settings?.shop_name || "임실참배추농원",
         shopPhone: settings?.shop_phone || settings?.phone || "010-0000-0000",
+        extraPhones: parseExtraPhones(settings?.extra_phones),
+        shareMessageTemplate: settings?.share_message_template,
         bankName: settings?.bank_name || "농협",
         bankAccount: settings?.bank_account || "",
         ownerName: settings?.owner_name || "",
@@ -256,7 +248,7 @@ export function OrderEditModal({
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
                 className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
                 required
               />
@@ -280,12 +272,6 @@ export function OrderEditModal({
               className="w-full text-xl font-black border-2 border-emerald-500 rounded-xl px-3.5 py-2.5 focus:border-emerald-700 bg-white"
               required
             />
-            <div className="text-xs md:text-sm font-bold text-slate-700 pt-1 flex justify-between">
-              <span>🚚 농가 발송 예정일:</span>
-              <span className="text-emerald-800 font-black">
-                {getDispatchDateStr(shippingDate)} (도착 전날 D-1)
-              </span>
-            </div>
           </div>
 
           {/* 배송 주소 */}

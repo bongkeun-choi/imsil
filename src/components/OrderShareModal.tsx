@@ -12,41 +12,16 @@ import {
   Image as ImageIcon,
   Smartphone,
   ExternalLink,
+  RotateCcw,
 } from "lucide-react";
 import { OrderCardData, generateOrderCardImage } from "@/lib/orderCardCanvas";
 import { useBackButtonModal } from "@/lib/useBackButtonModal";
+import {
+  generateOrderShareMessage,
+  DEFAULT_SHARE_MESSAGE_TEMPLATE,
+} from "@/lib/orderShareMessage";
 
-export function generateOrderShareMessage(data: OrderCardData): string {
-  const isPaid = data.paymentStatus === "PAID";
-  const formattedAmount = data.totalAmount.toLocaleString();
-  const fullAddress = `${data.shippingAddress} ${data.shippingAddressDetail || ""}`.trim();
-
-  let msg = `[${data.shopName || "임실참배추농원"} 주문 접수 안내]\n\n`;
-  msg += `안녕하세요, ${data.customerName} 고객님!\n`;
-  msg += `청정 임실 절임배추를 주문해 주셔서 진심으로 감사드립니다.\n\n`;
-  msg += `■ 주문 접수 내역\n`;
-  msg += `• 주문번호: ${data.orderNo}\n`;
-  msg += `• 주문상품: ${data.itemsSummary}\n`;
-  msg += `• 택배 도착 예정일: ${data.shippingDate} (도착 전날 신선 포장 발송)\n`;
-  msg += `• 받으실 주소: ${fullAddress}\n\n`;
-
-  msg += `■ 결제 및 입금 안내\n`;
-  msg += `• 결제금액: ${formattedAmount}원 (${isPaid ? "입금 확인 완료" : "입금 대기중"})\n`;
-  if (!isPaid) {
-    msg += `• 입금계좌: [${data.bankName || "농협"}] ${data.bankAccount || ""}\n`;
-    msg += `• 예금주: ${data.ownerName || ""}\n`;
-    msg += `(※ 주문자명과 입금자명이 다를 경우 꼭 연락 부탁드립니다.)\n\n`;
-  } else {
-    msg += `(입금이 정상 확인되었습니다. 정성껏 준비하겠습니다.)\n\n`;
-  }
-
-  msg += `■ 농가 문의처\n`;
-  msg += `• 농가명: ${data.shopName || "임실참배추농원"}\n`;
-  msg += `• 문의전화: ${data.shopPhone || "010-0000-0000"}\n\n`;
-  msg += `신선하고 깨끗한 절임배추로 엄선하여 안전하게 배송해 드리겠습니다. 감사합니다!`;
-
-  return msg;
-}
+export { generateOrderShareMessage };
 
 interface OrderShareModalProps {
   orderData: OrderCardData;
@@ -75,7 +50,7 @@ export function OrderShareModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    setMessageText(generateOrderShareMessage(orderData));
+    setMessageText(generateOrderShareMessage(orderData, orderData.shareMessageTemplate));
     setIsGeneratingImage(true);
 
     generateOrderCardImage(orderData)
@@ -301,16 +276,29 @@ export function OrderShareModal({
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm">
                 <span className="font-bold text-slate-700">
-                  전송 문구 (필요시 내용을 직접 수정할 수 있습니다)
+                  전송 문구 (필요시 수정 가능)
                 </span>
-                <button
-                  type="button"
-                  onClick={copyToClipboard}
-                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 cursor-pointer"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>문구 복사</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessageText(generateOrderShareMessage(orderData, orderData.shareMessageTemplate));
+                    }}
+                    className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded-md border border-slate-300 cursor-pointer"
+                    title="설정된 기본 문구 템플릿으로 다시 복원합니다"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>설정문구 복원</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={copyToClipboard}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200 cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>문구 복사</span>
+                  </button>
+                </div>
               </div>
 
               <textarea

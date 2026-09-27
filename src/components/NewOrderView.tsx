@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatPhone } from "@/lib/utils";
 import {
   Plus,
   Minus,
@@ -33,6 +33,7 @@ import { isContactPickerSupported, pickContactsFromDevice } from "@/lib/contactH
 import { OrderShareModal } from "@/components/OrderShareModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
 import { useBackButtonModal } from "@/lib/useBackButtonModal";
+import { parseExtraPhones } from "@/lib/orderShareMessage";
 
 interface NewOrderViewProps {
   settings: {
@@ -268,19 +269,6 @@ export function NewOrderView({
     }
   };
 
-  // 발송일 계산 헬퍼 (도착일 기준 D-1)
-  const getDispatchDateInfo = (arrivalDateStr: string) => {
-    if (!arrivalDateStr) return "";
-    try {
-      const arr = new Date(arrivalDateStr + "T00:00:00");
-      if (isNaN(arr.getTime())) return "";
-      const disp = addDays(arr, -1);
-      return format(disp, "yyyy년 MM월 dd일 (EEE)");
-    } catch {
-      return "";
-    }
-  };
-
   // 단가 계산 (현재 20kg 단일 규격 중심)
   const product20 = products.find((p) => Number(p.weight_kg) === 20) || {
     id: 2,
@@ -371,6 +359,8 @@ export function NewOrderView({
         memo: memo.trim(),
         shopName: settings.shop_name || "임실참배추농원",
         shopPhone: settings.shop_phone || (settings as any).phone || "010-0000-0000",
+        extraPhones: parseExtraPhones(settings.extra_phones),
+        shareMessageTemplate: settings.share_message_template,
         bankName: settings.bank_name || "농협",
         bankAccount: settings.bank_account || "",
         ownerName: settings.owner_name || "",
@@ -590,7 +580,7 @@ export function NewOrderView({
               <input
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhone(e.target.value))}
                 placeholder="예: 010-1234-5678"
                 className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
                 required
@@ -748,7 +738,7 @@ export function NewOrderView({
               </span>
             </div>
             <p className="text-sm font-semibold text-slate-600">
-              고객이 김치 담그기 전날 수령할 날짜를 선택합니다. (농가 발송·포장은 도착 전날 진행됩니다)
+              고객이 김치 담그기 전날 수령할 날짜를 선택합니다.
             </p>
             <input
               type="date"
@@ -757,12 +747,6 @@ export function NewOrderView({
               className="w-full text-2xl font-black border-2 border-emerald-500 rounded-xl px-4 py-3.5 focus:border-emerald-700 focus:outline-hidden bg-white"
               required
             />
-            <div className="p-3 bg-white border border-emerald-300 rounded-xl flex flex-wrap items-center justify-between text-sm md:text-base font-bold text-slate-800 shadow-xs gap-2">
-              <span className="text-slate-600">🚚 농가 택배 발송 예정일:</span>
-              <span className="text-emerald-800 font-black text-base md:text-lg">
-                {getDispatchDateInfo(shippingDate)} (도착 전날 D-1)
-              </span>
-            </div>
           </div>
 
           {/* 입금 상태 선택 */}

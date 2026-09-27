@@ -2,17 +2,22 @@
 
 import React, { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/utils";
-import { Download, CheckSquare, Square, MessageSquare, Phone, RefreshCw, Edit3, Share2 } from "lucide-react";
+import { Download, CheckSquare, Square, Phone, RefreshCw, Edit3, Share2, Printer } from "lucide-react";
 import { format } from "date-fns";
 import { fetchOrdersService, updateOrderActionService, fetchOrderByIdService } from "@/lib/services";
 import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderShareModal } from "@/components/OrderShareModal";
+import { ShipmentPrintModal } from "@/components/ShipmentPrintModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
+import { PhoneCallLink } from "@/components/PhoneCallLink";
+import { parseExtraPhones, generateOrderShareMessage } from "@/lib/orderShareMessage";
 
 interface ShipmentViewProps {
   settings: {
     shop_name?: string;
     shop_phone?: string;
+    extra_phones?: string;
+    share_message_template?: string;
     bank_name?: string;
     bank_account?: string;
     owner_name?: string;
@@ -30,6 +35,7 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
   const [trackingInput, setTrackingInput] = useState("");
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const handleOpenOrderShare = (ord: any) => {
     const shareData: OrderCardData = {
@@ -45,6 +51,8 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
       memo: ord.memo || "",
       shopName: settings?.shop_name || "임실참배추농원",
       shopPhone: settings?.shop_phone || "010-0000-0000",
+      extraPhones: parseExtraPhones(settings?.extra_phones),
+      shareMessageTemplate: settings?.share_message_template,
       bankName: settings?.bank_name || "농협",
       bankAccount: settings?.bank_account || "",
       ownerName: settings?.owner_name || "",
@@ -205,21 +213,27 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
 
   // 문자 발송 링크 생성
   const makeSmsUrl = (ord: any) => {
-    const shop = settings.shop_name || "임실 절임배추";
-    const bank = `${settings.bank_name || "농협"} ${settings.bank_account || ""} (${settings.owner_name || ""})`;
-    const items = (ord.items || [])
-      .map((i: any) => `${i.product_name} ${i.quantity}개`)
-      .join(", ");
-    
-    let text = `[${shop}]\n안녕하세요 ${ord.customer_name}님.\n주문하신 ${items}가 ${ord.shipping_date} 출고 예정입니다.`;
-    if (ord.payment_status !== "PAID") {
-      text += `\n\n* 입금계좌: ${bank}\n* 금액: ${formatPrice(ord.total_amount)}`;
-    }
-    if (ord.tracking_no) {
-      text += `\n* 운송장번호: ${ord.tracking_no}`;
-    }
-    text += `\n감사합니다.`;
+    const shareData: OrderCardData = {
+      orderNo: ord.order_no || "",
+      customerName: ord.customer_name || "",
+      customerPhone: ord.customer_phone || "",
+      shippingDate: ord.shipping_date || selectedDate,
+      shippingAddress: ord.shipping_address || "",
+      shippingAddressDetail: ord.shipping_address_detail || "",
+      itemsSummary: (ord.items || []).map((i: any) => `${i.product_name} ${i.quantity}개`).join(", ") || "절임배추 20kg",
+      totalAmount: Number(ord.total_amount) || 0,
+      paymentStatus: ord.payment_status || "UNPAID",
+      memo: ord.memo || "",
+      shopName: settings?.shop_name || "임실참배추농원",
+      shopPhone: settings?.shop_phone || "010-0000-0000",
+      extraPhones: parseExtraPhones(settings?.extra_phones),
+      shareMessageTemplate: settings?.share_message_template,
+      bankName: settings?.bank_name || "농협",
+      bankAccount: settings?.bank_account || "",
+      ownerName: settings?.owner_name || "",
+    };
 
+    const text = generateOrderShareMessage(shareData, settings?.share_message_template);
     return `sms:${ord.customer_phone.replace(/[^0-9]/g, "")}?body=${encodeURIComponent(text)}`;
   };
 
@@ -246,13 +260,22 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
           </button>
         </div>
 
-        <button
-          onClick={downloadCsv}
-          className="btn-large px-6 bg-slate-800 hover:bg-slate-900 text-white rounded-xl cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
-        >
-          <Download className="w-5 h-5 text-emerald-400" />
-          <span>우체국 택배용 CSV 다운로드</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setShowPrintModal(true)}
+            className="btn-large px-4 bg-emerald-700 hover:bg-emerald-800 text-white cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
+          >
+            <Printer className="w-5 h-5" />
+            <span>인쇄 / PDF</span>
+          </button>
+          <button
+            onClick={downloadCsv}
+            className="btn-large px-4 bg-slate-800 hover:bg-slate-900 text-white cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
+          >
+            <Download className="w-5 h-5 text-emerald-400" />
+            <span>CSV 다운로드</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. 발송 명단 목록 */}
@@ -299,13 +322,14 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
                         <span className="text-2xl font-black text-slate-900">
                           {ord.customer_name}
                         </span>
-                        <a
-                          href={`tel:${ord.customer_phone.replace(/[^0-9]/g, "")}`}
-                          className="inline-flex items-center gap-1 text-base font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md hover:bg-emerald-100"
-                        >
-                          <Phone className="w-4 h-4" />
-                          <span>{ord.customer_phone}</span>
-                        </a>
+                        <div className="inline-flex items-center text-base font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md">
+                          <PhoneCallLink
+                            phone={ord.customer_phone}
+                            name={ord.customer_name}
+                            showIcon
+                            className="text-emerald-800 font-bold hover:underline"
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() => handleOpenOrderShare(ord)}
@@ -418,6 +442,17 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
           </div>
         )}
       </div>
+
+      {/* 인쇄 / PDF 미리보기 모달 */}
+      {showPrintModal && (
+        <ShipmentPrintModal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          orders={orders}
+          selectedDate={selectedDate}
+          settings={settings}
+        />
+      )}
 
       {/* 주문 상세 수정 모달 */}
       {editingOrder && (

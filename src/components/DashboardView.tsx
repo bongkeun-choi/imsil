@@ -24,6 +24,8 @@ import { format, addDays, eachDayOfInterval, isSameDay } from "date-fns";
 import { OrderShareModal } from "@/components/OrderShareModal";
 import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
+import { PhoneCallLink } from "@/components/PhoneCallLink";
+import { parseExtraPhones } from "@/lib/orderShareMessage";
 
 interface DashboardViewProps {
   onGoToNewOrder: () => void;
@@ -128,6 +130,8 @@ export function DashboardView({
       memo: ord.memo || "",
       shopName: settings?.shop_name || "임실참배추농원",
       shopPhone: settings?.shop_phone || settings?.phone || "010-0000-0000",
+      extraPhones: parseExtraPhones(settings?.extra_phones),
+      shareMessageTemplate: settings?.share_message_template,
       bankName: settings?.bank_name || "농협",
       bankAccount: settings?.bank_account || "",
       ownerName: settings?.owner_name || "",
@@ -256,62 +260,59 @@ export function DashboardView({
       </div>
 
       {/* 2. 오늘 도착 절임배추 수량 요약 카드 & 발송 안내 */}
-      <div className="bg-white rounded-2xl border-2 border-slate-300 p-6 shadow-sm space-y-5">
-        <div className="border-b border-slate-200 pb-3 flex flex-wrap justify-between items-center gap-2">
+      <div className="bg-white rounded-xl border border-slate-300 p-4 sm:p-5 shadow-xs space-y-3.5">
+        <div className="border-b border-slate-200 pb-2.5 flex flex-wrap justify-between items-center gap-2">
           <div>
-            <h2 className="text-2xl md:text-3xl font-black text-slate-900">
+            <h2 className="text-lg sm:text-xl font-black text-slate-900">
               {selectedDate} 택배 도착 현황
             </h2>
-            <p className="text-sm font-bold text-emerald-800 mt-0.5">
-              농가 택배 발송 및 포장일: {format(addDays(new Date(selectedDate + "T00:00:00"), -1), "yyyy년 M월 d일 (EEE)")} (도착 전날 D-1)
-            </p>
           </div>
-          <span className="text-base md:text-lg font-black text-slate-700 bg-slate-100 px-3 py-1 rounded-xl">
+          <span className="text-xs sm:text-sm font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
             총 {summary.totalOrders}건 도착 예정
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-          <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 shadow-xs">
-            <div className="text-lg md:text-xl font-black text-emerald-950 mb-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+          <div className="bg-emerald-50/70 border border-emerald-300 rounded-xl p-3 sm:p-3.5 shadow-2xs">
+            <div className="text-xs sm:text-sm font-bold text-emerald-900 mb-0.5">
               절임배추 20kg
             </div>
-            <div className="text-4xl md:text-5xl font-black text-emerald-700 stat-number">
-              {summary.qty20kg} <span className="text-2xl font-bold">박스</span>
+            <div className="text-2xl sm:text-3xl font-black text-emerald-700 stat-number">
+              {summary.qty20kg} <span className="text-base sm:text-lg font-bold">박스</span>
             </div>
           </div>
 
-          <div className="bg-slate-100 border-2 border-slate-300 rounded-2xl p-5">
-            <div className="text-lg md:text-xl font-extrabold text-slate-800 mb-1">
+          <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 sm:p-3.5">
+            <div className="text-xs sm:text-sm font-bold text-slate-700 mb-0.5">
               총 중량
             </div>
-            <div className="text-4xl md:text-5xl font-black text-slate-900 stat-number">
-              {summary.totalWeight} <span className="text-2xl font-bold">kg</span>
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 stat-number">
+              {summary.totalWeight} <span className="text-base sm:text-lg font-bold">kg</span>
             </div>
           </div>
 
-          <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5">
-            <div className="text-lg md:text-xl font-extrabold text-amber-950 mb-1">
+          <div className="bg-amber-50/70 border border-amber-300 rounded-xl p-3 sm:p-3.5">
+            <div className="text-xs sm:text-sm font-bold text-amber-900 mb-0.5">
               당일 미입금
             </div>
-            <div className="text-4xl md:text-5xl font-black text-amber-800 stat-number">
-              {summary.unpaidCount} <span className="text-2xl font-bold">건</span>
+            <div className="text-2xl sm:text-3xl font-black text-amber-800 stat-number">
+              {summary.unpaidCount} <span className="text-base sm:text-lg font-bold">건</span>
             </div>
-            <div className="text-xs font-bold text-amber-700 mt-1">
+            <div className="text-xs font-semibold text-amber-700 mt-0.5">
               {formatPrice(summary.unpaidTotal)}
             </div>
           </div>
         </div>
 
-        <div className="pt-2 flex flex-wrap justify-between items-center gap-2">
-          <div className="text-sm font-bold text-slate-600">
+        <div className="pt-1 flex flex-wrap justify-between items-center gap-2">
+          <div className="text-xs sm:text-sm font-medium text-slate-600">
             💡 내일 도착할 배추는 오늘 우체국택배로 발송해야 합니다.
           </div>
           <button
             onClick={onGoToShipments}
-            className="inline-flex items-center gap-2 text-base md:text-lg font-black text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer"
           >
-            택배 발송 및 운송장 등록 바로가기 <ArrowRight className="w-5 h-5" />
+            택배 발송 및 운송장 등록 바로가기 <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -330,7 +331,7 @@ export function DashboardView({
             onClick={onGoToCalendar}
             className="inline-flex items-center gap-1.5 text-base font-black text-emerald-800 hover:text-emerald-950 underline cursor-pointer"
           >
-            <span>도착 달력 전체 보기</span>
+            <span>주문일정 전체 보기</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -385,7 +386,6 @@ export function DashboardView({
                   {count > 0 ? (
                     <div className="space-y-0.5 text-xs font-black">
                       <div className="text-emerald-950 font-black">20kg {sched.qty20kg}박스</div>
-                      <div className="text-[10px] text-slate-500 font-bold">(발송: D-1)</div>
                     </div>
                   ) : (
                     <div className="text-xs text-slate-400 py-1 font-medium">
@@ -431,45 +431,45 @@ export function DashboardView({
             {unpaidOrders.map((ord: any) => (
               <div
                 key={ord.id}
-                className="bg-amber-50/70 border border-amber-300 p-4 rounded-xl flex flex-wrap items-center justify-between gap-3"
+                className="bg-amber-50/70 border border-amber-300 p-3"
               >
-                <div>
-                  <div className="flex items-center gap-2 text-xl font-bold text-slate-900">
-                    <span>{ord.customer_name}</span>
-                    <span className="text-base text-slate-600 font-normal">
-                      ({ord.customer_phone})
-                    </span>
-                  </div>
-                  <div className="text-lg font-extrabold text-amber-900 mt-1">
-                    주문금액: {formatPrice(ord.total_amount)}
-                  </div>
+                {/* 고객 정보 행 */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-lg font-bold text-slate-900">{ord.customer_name}</span>
+                  <PhoneCallLink
+                    phone={ord.customer_phone}
+                    name={ord.customer_name}
+                    showIcon
+                    className="text-sm text-emerald-800 font-bold hover:underline"
+                  />
+                  <span className="text-sm font-extrabold text-amber-900 ml-auto">{formatPrice(ord.total_amount)}</span>
                 </div>
-
-                <div className="flex items-center gap-2">
+                {/* 버튼 행 - 한 줄 유지 */}
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => handleOpenOrderShare(ord)}
-                    className="btn-large px-4 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg cursor-pointer flex items-center gap-1.5 font-bold shadow-xs transition-colors"
+                    className="shrink-0 px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 cursor-pointer flex items-center gap-1 font-bold text-sm transition-colors whitespace-nowrap"
                     title="입금 안내 문자/카톡 전송"
                   >
-                    <Share2 className="w-4 h-4 text-amber-800" />
+                    <Share2 className="w-3.5 h-3.5 text-amber-800" />
                     <span>문자·카톡</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleOpenOrderEdit(ord)}
-                    className="btn-large px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg cursor-pointer flex items-center gap-1.5 font-bold shadow-xs transition-colors"
+                    className="shrink-0 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 cursor-pointer flex items-center gap-1 font-bold text-sm transition-colors whitespace-nowrap"
                     title="주문 정보 수정"
                   >
-                    <Edit3 className="w-4 h-4 text-blue-700" />
+                    <Edit3 className="w-3.5 h-3.5 text-blue-700" />
                     <span>수정</span>
                   </button>
                   <button
                     onClick={() => handleMarkPaid(ord.id)}
                     disabled={updatingId === ord.id}
-                    className="btn-large px-6 bg-amber-600 hover:bg-amber-700 text-white rounded-lg cursor-pointer flex items-center gap-2 font-bold shadow-xs transition-colors"
+                    className="shrink-0 px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white cursor-pointer flex items-center gap-1.5 font-bold text-sm transition-colors whitespace-nowrap ml-auto"
                   >
-                    <CheckCircle2 className="w-5 h-5" />
+                    <CheckCircle2 className="w-4 h-4" />
                     <span>{updatingId === ord.id ? "처리 중..." : "입금 완료"}</span>
                   </button>
                 </div>
@@ -494,71 +494,55 @@ export function DashboardView({
         ) : (
           <div className="divide-y divide-slate-200">
             {orders.map((ord: any) => (
-              <div key={ord.id} className="py-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-extrabold text-slate-900">
-                      {ord.customer_name}
-                    </span>
-                    <a
-                      href={`tel:${ord.customer_phone.replace(/[^0-9]/g, "")}`}
-                      className="text-base text-emerald-800 font-bold hover:underline"
-                    >
-                      {ord.customer_phone}
-                    </a>
-                  </div>
-                  <div className="text-base text-slate-700 mt-1">
-                    배송지: {ord.shipping_address} {ord.shipping_address_detail}
-                  </div>
+              <div key={ord.id} className="py-3 border-b border-slate-200 last:border-0">
+                {/* 고객 정보 행 */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-lg font-extrabold text-slate-900">{ord.customer_name}</span>
+                  <PhoneCallLink
+                    phone={ord.customer_phone}
+                    name={ord.customer_name}
+                    showIcon
+                    className="text-sm text-emerald-800 font-bold hover:underline"
+                  />
                   {ord.memo && (
-                    <div className="text-sm font-semibold text-rose-700 mt-0.5">
+                    <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 border border-rose-200">
                       메모: {ord.memo}
-                    </div>
+                    </span>
                   )}
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`px-3 py-1 rounded-full text-base font-bold ${
-                      ord.payment_status === "PAID"
-                        ? "bg-blue-100 text-blue-900 border border-blue-300"
-                        : "bg-red-100 text-red-900 border border-red-300"
-                    }`}
-                  >
+                <div className="text-xs text-slate-500 mt-0.5">{ord.shipping_address} {ord.shipping_address_detail}</div>
+                {/* 상태 + 버튼 행 - 한 줄 유지 */}
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto">
+                  <span className={`shrink-0 px-2 py-0.5 text-xs font-bold ${
+                    ord.payment_status === "PAID"
+                      ? "bg-blue-100 text-blue-900 border border-blue-300"
+                      : "bg-red-100 text-red-900 border border-red-300"
+                  }`}>
                     {ord.payment_status === "PAID" ? "입금완료" : "미입금"}
                   </span>
-
-                  <span
-                    className={`px-3 py-1 rounded-full text-base font-bold ${
-                      ord.order_status === "PACKED" || ord.order_status === "SHIPPED"
-                        ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
-                        : "bg-slate-100 text-slate-800 border border-slate-300"
-                    }`}
-                  >
-                    {ord.order_status === "PACKED"
-                      ? "포장완료"
-                      : ord.order_status === "SHIPPED"
-                      ? "발송완료"
-                      : "포장대기"}
+                  <span className={`shrink-0 px-2 py-0.5 text-xs font-bold ${
+                    ord.order_status === "PACKED" || ord.order_status === "SHIPPED"
+                      ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
+                      : "bg-slate-100 text-slate-800 border border-slate-300"
+                  }`}>
+                    {ord.order_status === "PACKED" ? "포장완료" : ord.order_status === "SHIPPED" ? "발송완료" : "포장대기"}
                   </span>
-
                   <button
                     type="button"
                     onClick={() => handleOpenOrderShare(ord)}
-                    className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-sm font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    className="shrink-0 px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
                     title="문자/카톡 발송"
                   >
-                    <Share2 className="w-4 h-4 text-amber-700" />
+                    <Share2 className="w-3.5 h-3.5 text-amber-700" />
                     <span>문자·카톡</span>
                   </button>
-
                   <button
                     type="button"
                     onClick={() => handleOpenOrderEdit(ord)}
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg text-sm font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    className="shrink-0 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
                     title="주문 정보 수정"
                   >
-                    <Edit3 className="w-4 h-4 text-blue-700" />
+                    <Edit3 className="w-3.5 h-3.5 text-blue-700" />
                     <span>수정</span>
                   </button>
                 </div>
