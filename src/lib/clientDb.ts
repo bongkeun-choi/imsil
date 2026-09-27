@@ -108,11 +108,21 @@ export async function initClientTables(client: Client): Promise<void> {
         payment_status TEXT NOT NULL DEFAULT 'UNPAID',
         order_status TEXT NOT NULL DEFAULT 'RECEIVED',
         memo TEXT,
+        order_type TEXT DEFAULT 'NORMAL',
+        event_name TEXT DEFAULT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY(customer_id) REFERENCES customers(id)
       );
     `);
+
+    // 기존 orders 테이블 컬럼 추가 안전 마이그레이션
+    try {
+      await client.execute("ALTER TABLE orders ADD COLUMN order_type TEXT DEFAULT 'NORMAL'");
+    } catch (_) {}
+    try {
+      await client.execute("ALTER TABLE orders ADD COLUMN event_name TEXT DEFAULT NULL");
+    } catch (_) {}
 
     await client.execute(`
       CREATE TABLE IF NOT EXISTS order_items (

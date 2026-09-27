@@ -19,6 +19,8 @@ interface PrintOrder {
   order_status: string;
   tracking_no?: string;
   memo?: string;
+  order_type?: string;
+  event_name?: string;
 }
 
 interface ShipmentPrintModalProps {
@@ -45,10 +47,19 @@ export function ShipmentPrintModal({
 }: ShipmentPrintModalProps) {
   const printFrameRef = useRef<HTMLIFrameElement>(null);
 
+  const eventOrders = orders.filter((o) => o.order_type === "EVENT" || !!o.event_name);
+  const normalOrders = orders.filter((o) => !(o.order_type === "EVENT" || !!o.event_name));
+
   const totalBoxes = orders.reduce((sum, o) => {
     const qty = (o.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
     return sum + qty;
   }, 0);
+  const eventBoxes = eventOrders.reduce((sum, o) => {
+    const qty = (o.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
+    return sum + qty;
+  }, 0);
+  const normalBoxes = totalBoxes - eventBoxes;
+
   const totalWeight = totalBoxes * 20;
   const unpaidCount = orders.filter((o) => o.payment_status !== "PAID").length;
   const packedCount = orders.filter(
@@ -70,6 +81,7 @@ export function ShipmentPrintModal({
   const buildPrintHtml = () => {
     const rows = orders
       .map((o, idx) => {
+        const isEv = o.order_type === "EVENT" || !!o.event_name;
         // 박스 수량만 합산
         const totalQty = (o.items || []).reduce((s: number, i: any) => s + (i.quantity || 0), 0);
         const addr = [o.shipping_address, o.shipping_address_detail]
@@ -83,7 +95,10 @@ export function ShipmentPrintModal({
         return `
           <tr style="background:${rowBg};border-bottom:1px solid #e2e8f0;">
             <td style="padding:9px 7px;text-align:center;font-weight:700;color:#64748b;font-size:13px;">${idx + 1}</td>
-            <td style="padding:9px 7px;font-weight:800;font-size:15px;color:#0f172a;white-space:nowrap;">${o.customer_name}</td>
+            <td style="padding:9px 7px;font-weight:800;font-size:15px;color:#0f172a;white-space:nowrap;">
+              ${o.customer_name}
+              ${isEv ? `<span style="display:inline-block;padding:1px 5px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe;border-radius:3px;font-size:11px;font-weight:800;margin-left:4px;">🎪 ${o.event_name || "행사납품"}</span>` : ""}
+            </td>
             <td style="padding:9px 7px;font-size:13px;color:#065f46;font-weight:600;white-space:nowrap;">${o.customer_phone}</td>
             <td style="padding:9px 7px;font-weight:800;color:#064e3b;font-size:15px;text-align:center;">${totalQty}박스</td>
             <td style="padding:9px 7px;font-size:12px;color:#334155;">${addr}</td>
@@ -111,6 +126,7 @@ export function ShipmentPrintModal({
     .badge { display:inline-block; padding:3px 10px; border-radius:3px; font-weight:700; font-size:12px; }
     .badge-green { background:#d1fae5; color:#064e3b; border:1px solid #6ee7b7; }
     .badge-amber { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+    .badge-purple { background:#f3e8ff; color:#6b21a8; border:1px solid #d8b4fe; font-weight:800; }
     .section-title { font-size:13px; font-weight:800; color:#064e3b; margin-bottom:7px; padding:4px 8px; background:#f0fdf4; border-left:4px solid #059669; }
     table { width:100%; border-collapse:collapse; }
     thead tr { background:#0f172a; color:#fff; }
@@ -134,7 +150,9 @@ export function ShipmentPrintModal({
       <div class="date">출력일시: ${printDate}</div>
       <div class="badges">
         <span class="badge badge-green">총 ${orders.length}건</span>
-        <span class="badge badge-amber">절임배추 20kg &times; ${totalBoxes}박스 (${totalWeight}kg)</span>
+        <span class="badge badge-amber">일반: ${normalBoxes}박스</span>
+        ${eventBoxes > 0 ? `<span class="badge badge-purple">🎪 김치축제: ${eventBoxes}박스</span>` : ""}
+        <span class="badge badge-amber">총 ${totalBoxes}박스 (${totalWeight}kg)</span>
       </div>
     </div>
   </div>
@@ -283,7 +301,14 @@ export function ShipmentPrintModal({
 
         <div className="bg-slate-800 px-5 py-2 flex flex-wrap items-center gap-2 text-xs font-bold shrink-0">
           <span className="bg-emerald-700 text-white px-3 py-1">총 {orders.length}건</span>
-          <span className="bg-amber-700 text-white px-3 py-1">20kg × {totalBoxes}박스 ({totalWeight}kg)</span>
+          <span className="bg-amber-700 text-white px-3 py-1">일반 {normalBoxes}박스</span>
+          {eventBoxes > 0 && (
+            <span className="bg-purple-700 text-purple-100 border border-purple-400 px-3 py-1 flex items-center gap-1 font-black">
+              <span>🎪</span>
+              <span>김치축제 {eventBoxes}박스</span>
+            </span>
+          )}
+          <span className="bg-slate-700 text-amber-300 px-3 py-1">총 {totalBoxes}박스 ({totalWeight}kg)</span>
           <span className="bg-slate-600 text-emerald-300 px-3 py-1">포장완료 {packedCount}/{orders.length}</span>
           {unpaidCount > 0 && (
             <span className="bg-red-700 text-white px-3 py-1">미입금 {unpaidCount}건 주의</span>

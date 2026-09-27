@@ -66,6 +66,9 @@ export function NewOrderView({
     return initialShippingDate || format(addDays(new Date(), 2), "yyyy-MM-dd");
   });
   const [paymentStatus, setPaymentStatus] = useState<"UNPAID" | "PAID">("UNPAID");
+  // 행사·축제 납품 물량 구분 상태
+  const [isEvent, setIsEvent] = useState(false);
+  const [eventName, setEventName] = useState("임실 김치 축제");
   const [createdOrderShareData, setCreatedOrderShareData] = useState<OrderCardData | null>(null);
   const [showPostOrderPrompt, setShowPostOrderPrompt] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -322,6 +325,8 @@ export function NewOrderView({
           shipping_address: address.trim(),
           shipping_address_detail: addressDetail.trim(),
           shipping_date: shippingDate,
+          order_type: isEvent ? "EVENT" : "NORMAL",
+          event_name: isEvent ? (eventName.trim() || "임실 김치 축제") : null,
           items,
           memo: memo.trim(),
           is_paid: paymentStatus === "PAID",
@@ -335,6 +340,8 @@ export function NewOrderView({
           address: address.trim(),
           address_detail: addressDetail.trim(),
           shipping_date: shippingDate,
+          order_type: isEvent ? "EVENT" : "NORMAL",
+          event_name: isEvent ? (eventName.trim() || "임실 김치 축제") : null,
           items,
           payment_status: paymentStatus,
           memo: memo.trim(),
@@ -560,6 +567,76 @@ export function NewOrderView({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* 주문 구분: 일반 고객 택배 주문 vs 행사·축제 납품 */}
+          <div className="bg-slate-100 p-4 rounded-2xl border-2 border-slate-300 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-1">
+              <label className="text-base font-extrabold text-slate-900 flex items-center gap-1.5">
+                <span>주문 구분</span>
+                <span className="text-xs font-bold text-slate-500">
+                  (행사·축제 물량은 스케줄에서 별도로 분리 집계됩니다)
+                </span>
+              </label>
+              {isEvent && (
+                <span className="text-xs font-black text-purple-800 bg-purple-100 border border-purple-300 px-2.5 py-0.5 rounded-full whitespace-nowrap animate-pulse">
+                  🎪 행사 납품 모드
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsEvent(false)}
+                className={`py-3 px-3 rounded-xl font-black text-sm md:text-base flex items-center justify-center gap-2 cursor-pointer transition-all border-2 ${
+                  !isEvent
+                    ? "bg-emerald-700 text-white border-emerald-800 shadow-md ring-2 ring-emerald-300"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <span>📦 일반 고객 택배</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEvent(true)}
+                className={`py-3 px-3 rounded-xl font-black text-sm md:text-base flex items-center justify-center gap-2 cursor-pointer transition-all border-2 ${
+                  isEvent
+                    ? "bg-purple-700 text-white border-purple-800 shadow-md ring-2 ring-purple-300"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <span>🎪 행사·축제 납품</span>
+              </button>
+            </div>
+
+            {isEvent && (
+              <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-150">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-sm font-black text-purple-950 flex items-center gap-1.5">
+                    <span>행사 / 축제 이름 <span className="text-red-600">*</span></span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEventName("임실 김치 축제")}
+                    className="text-xs font-black bg-white hover:bg-purple-100 text-purple-800 border border-purple-300 px-2.5 py-1 rounded-md cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                  >
+                    + 임실 김치 축제 자동입력
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={eventName}
+                  onChange={(e) => setEventName(e.target.value)}
+                  placeholder="예: 임실 김치 축제"
+                  className="w-full text-base font-black border-2 border-purple-400 rounded-lg px-3 py-2 bg-white text-purple-950 focus:border-purple-600 focus:outline-hidden shadow-inner"
+                  required={isEvent}
+                />
+                <p className="text-xs text-purple-800 font-medium">
+                  💡 이 주문은 달력 스케줄러, 출고 현황, 발송 명단에서 보라색 <strong>[임실 김치 축제]</strong> 뱃지로 일반 택배와 완전히 별도 집계 및 구분 표시됩니다.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* 고객명 & 연락처 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

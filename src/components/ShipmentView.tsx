@@ -36,6 +36,7 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [orderFilter, setOrderFilter] = useState<"ALL" | "NORMAL" | "EVENT">("ALL");
 
   const handleOpenOrderShare = (ord: any) => {
     const shareData: OrderCardData = {
@@ -61,6 +62,7 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
   };
 
   const handleOpenOrderEdit = async (ord: any) => {
+    const isEvent = ord.order_type === "EVENT" || !!ord.event_name;
     const qty20kg = (ord.items && ord.items[0]?.quantity) || ord.qty20kg || 1;
     setEditingOrder({
       id: ord.id,
@@ -77,6 +79,8 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
       payment_status: ord.payment_status || "UNPAID",
       memo: ord.memo || "",
       items: ord.items || [],
+      order_type: ord.order_type || (isEvent ? "EVENT" : "NORMAL"),
+      event_name: ord.event_name || (isEvent ? "임실 김치 축제" : ""),
     });
 
     if (ord.id) {
@@ -85,6 +89,7 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
         if (fullDetail) {
           const detailQty20 =
             (fullDetail.items && fullDetail.items[0]?.quantity) || qty20kg;
+          const fullIsEvent = fullDetail.order_type === "EVENT" || !!fullDetail.event_name;
           setEditingOrder({
             id: fullDetail.id,
             customer_id: fullDetail.customer_id,
@@ -100,6 +105,8 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
             payment_status: fullDetail.payment_status || "UNPAID",
             memo: fullDetail.memo || "",
             items: fullDetail.items || [],
+            order_type: fullDetail.order_type || (fullIsEvent ? "EVENT" : "NORMAL"),
+            event_name: fullDetail.event_name || (fullIsEvent ? "임실 김치 축제" : ""),
           });
         }
       } catch (err) {
@@ -175,6 +182,8 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
 
     const headers = [
       "주문번호",
+      "구분",
+      "행사명",
       "받는분성명",
       "전화번호",
       "배송지주소",
@@ -185,11 +194,14 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
     ];
 
     const rows = orders.map((o) => {
+      const isEv = o.order_type === "EVENT" || !!o.event_name;
       const itemsStr = (o.items || [])
         .map((i: any) => `${i.product_name} ${i.quantity}개`)
         .join(" / ");
       return [
         `"${o.order_no}"`,
+        `"${isEv ? "행사납품" : "일반택배"}"`,
+        `"${o.event_name || (isEv ? "임실 김치 축제" : "")}"`,
         `"${o.customer_name}"`,
         `"${o.customer_phone}"`,
         `"${o.shipping_address}"`,
@@ -236,6 +248,12 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
     const text = generateOrderShareMessage(shareData, settings?.share_message_template);
     return `sms:${ord.customer_phone.replace(/[^0-9]/g, "")}?body=${encodeURIComponent(text)}`;
   };
+
+  const eventOrders = orders.filter((o) => o.order_type === "EVENT" || !!o.event_name);
+  const normalOrders = orders.filter((o) => !(o.order_type === "EVENT" || !!o.event_name));
+  const totalQty20kg = orders.reduce((acc, o) => acc + (o.qty20kg || (o.items && o.items[0]?.quantity) || 1), 0);
+  const eventQty20kg = eventOrders.reduce((acc, o) => acc + (o.qty20kg || (o.items && o.items[0]?.quantity) || 1), 0);
+  const normalQty20kg = normalOrders.reduce((acc, o) => acc + (o.qty20kg || (o.items && o.items[0]?.quantity) || 1), 0);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-20">
@@ -285,14 +303,62 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
             <h2 className="text-2xl md:text-3xl font-black text-slate-900">
               {selectedDate} 도착 대상 발송 명단 ({orders.length}건)
             </h2>
-            <p className="text-xs md:text-sm font-bold text-emerald-800 mt-0.5">
-              도착일 전날 포장하여 우체국택배로 전달합니다.
-            </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm font-bold text-slate-600 mt-1">
+              <span>도착일 전날 포장하여 전달합니다.</span>
+              <span className="text-emerald-900 font-extrabold">일반 택배: {normalQty20kg}박스</span>
+              {eventQty20kg > 0 && (
+                <span className="bg-purple-100 text-purple-900 border border-purple-300 px-2 py-0.5 rounded-full font-black flex items-center gap-1">
+                  <span>🎪</span>
+                  <span>임실 김치 축제: {eventQty20kg}박스 ({eventOrders.length}건)</span>
+                </span>
+              )}
+              <span>(총 {totalQty20kg}박스)</span>
+            </div>
           </div>
           <span className="text-sm md:text-base text-slate-600 font-semibold">
             박스 포장 후 체크 버튼을 누르면 포장완료 처리됩니다.
           </span>
         </div>
+
+        {/* 행사 납품이 있을 때 탭 필터 */}
+        {eventOrders.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap mb-4 pb-1">
+            <button
+              type="button"
+              onClick={() => setOrderFilter("ALL")}
+              className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                orderFilter === "ALL"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              전체 ({orders.length}건)
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrderFilter("NORMAL")}
+              className={`px-3.5 py-1.5 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                orderFilter === "NORMAL"
+                  ? "bg-emerald-700 text-white shadow-xs"
+                  : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
+              }`}
+            >
+              일반 택배 ({normalOrders.length}건 &middot; {normalQty20kg}박스)
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrderFilter("EVENT")}
+              className={`px-3.5 py-1.5 rounded-xl text-sm font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                orderFilter === "EVENT"
+                  ? "bg-purple-700 text-white shadow-xs"
+                  : "bg-purple-100 text-purple-900 hover:bg-purple-200 border border-purple-300"
+              }`}
+            >
+              <span>🎪</span>
+              <span>행사 납품 ({eventOrders.length}건 &middot; {eventQty20kg}박스)</span>
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="py-16 text-center text-xl font-bold text-slate-700">
@@ -304,24 +370,40 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map((ord) => {
-              const isPacked =
-                ord.order_status === "PACKED" || ord.order_status === "SHIPPED";
-              return (
-                <div
-                  key={ord.id}
-                  className={`border-2 rounded-2xl p-5 transition-all ${
-                    isPacked
-                      ? "bg-slate-50 border-slate-300 opacity-90"
-                      : "bg-white border-emerald-400 shadow-xs"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="space-y-1.5 flex-1 min-w-[280px]">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl font-black text-slate-900">
-                          {ord.customer_name}
-                        </span>
+            {orders
+              .filter((ord) => {
+                const isEv = ord.order_type === "EVENT" || !!ord.event_name;
+                if (orderFilter === "NORMAL") return !isEv;
+                if (orderFilter === "EVENT") return isEv;
+                return true;
+              })
+              .map((ord) => {
+                const isEvent = ord.order_type === "EVENT" || !!ord.event_name;
+                const isPacked =
+                  ord.order_status === "PACKED" || ord.order_status === "SHIPPED";
+                return (
+                  <div
+                    key={ord.id}
+                    className={`border-2 rounded-2xl p-5 transition-all ${
+                      isPacked
+                        ? "bg-slate-50 border-slate-300 opacity-90"
+                        : isEvent
+                        ? "bg-purple-50/40 border-purple-400 shadow-xs"
+                        : "bg-white border-emerald-400 shadow-xs"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="space-y-1.5 flex-1 min-w-[280px]">
+                        <div className="flex items-center gap-3 flex-wrap">
+                          {isEvent && (
+                            <span className="shrink-0 px-2.5 py-1 text-xs font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-md inline-flex items-center gap-1">
+                              <span>🎪</span>
+                              <span>{ord.event_name || "임실 김치 축제"} 납품</span>
+                            </span>
+                          )}
+                          <span className="text-2xl font-black text-slate-900">
+                            {ord.customer_name}
+                          </span>
                         <div className="inline-flex items-center text-base font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md">
                           <PhoneCallLink
                             phone={ord.customer_phone}

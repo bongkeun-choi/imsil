@@ -52,8 +52,10 @@ export function DashboardView({
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [sharingOrder, setSharingOrder] = useState<OrderCardData | null>(null);
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
+  const [orderFilter, setOrderFilter] = useState<"ALL" | "NORMAL" | "EVENT">("ALL");
 
   const handleOpenOrderEdit = async (ord: any) => {
+    const isEvent = ord.order_type === "EVENT" || !!ord.event_name;
     const qty20kg = ord.qty20kg || ord.quantity || (ord.items && ord.items[0]?.quantity) || 1;
     setEditingOrder({
       id: ord.id,
@@ -70,6 +72,8 @@ export function DashboardView({
       payment_status: ord.payment_status || "UNPAID",
       memo: ord.memo || "",
       items: ord.items || [],
+      order_type: ord.order_type || (isEvent ? "EVENT" : "NORMAL"),
+      event_name: ord.event_name || (isEvent ? "임실 김치 축제" : ""),
     });
 
     if (ord.id) {
@@ -78,6 +82,7 @@ export function DashboardView({
         if (fullDetail) {
           const detailQty20 =
             (fullDetail.items && fullDetail.items[0]?.quantity) || qty20kg;
+          const fullIsEvent = fullDetail.order_type === "EVENT" || !!fullDetail.event_name;
           setEditingOrder({
             id: fullDetail.id,
             customer_id: fullDetail.customer_id,
@@ -93,6 +98,8 @@ export function DashboardView({
             payment_status: fullDetail.payment_status || "UNPAID",
             memo: fullDetail.memo || "",
             items: fullDetail.items || [],
+            order_type: fullDetail.order_type || (fullIsEvent ? "EVENT" : "NORMAL"),
+            event_name: fullDetail.event_name || (fullIsEvent ? "임실 김치 축제" : ""),
           });
         }
       } catch (err) {
@@ -210,6 +217,10 @@ export function DashboardView({
     totalWeight: 0,
     qty10kg: 0,
     qty20kg: 0,
+    normalQty20kg: 0,
+    eventQty20kg: 0,
+    eventOrdersCount: 0,
+    eventNames: [],
     unpaidCount: 0,
     unpaidTotal: 0,
   };
@@ -272,15 +283,30 @@ export function DashboardView({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+        <div className={`grid grid-cols-1 ${(summary.eventQty20kg ?? 0) > 0 ? "sm:grid-cols-2 md:grid-cols-4" : "md:grid-cols-3"} gap-3 text-center`}>
           <div className="bg-emerald-50/70 border border-emerald-300 rounded-xl p-3 sm:p-3.5 shadow-2xs">
             <div className="text-xs sm:text-sm font-bold text-emerald-900 mb-0.5">
-              절임배추 20kg
+              {(summary.eventQty20kg ?? 0) > 0 ? "일반 택배 (20kg)" : "절임배추 20kg"}
             </div>
             <div className="text-2xl sm:text-3xl font-black text-emerald-700 stat-number">
-              {summary.qty20kg} <span className="text-base sm:text-lg font-bold">박스</span>
+              {summary.normalQty20kg ?? summary.qty20kg} <span className="text-base sm:text-lg font-bold">박스</span>
             </div>
           </div>
+
+          {(summary.eventQty20kg ?? 0) > 0 && (
+            <div className="bg-purple-50 border-2 border-purple-400 rounded-xl p-3 sm:p-3.5 shadow-2xs text-purple-900">
+              <div className="text-xs sm:text-sm font-black flex items-center justify-center gap-1 mb-0.5 text-purple-900 truncate">
+                <span>🎪</span>
+                <span>{summary.eventNames?.join(", ") || "임실 김치 축제"}</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-purple-800 stat-number">
+                {summary.eventQty20kg} <span className="text-base sm:text-lg font-bold">박스</span>
+              </div>
+              <div className="text-xs font-bold text-purple-700 mt-0.5">
+                행사 {summary.eventOrdersCount}건 납품
+              </div>
+            </div>
+          )}
 
           <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 sm:p-3.5">
             <div className="text-xs sm:text-sm font-bold text-slate-700 mb-0.5">
@@ -385,7 +411,17 @@ export function DashboardView({
 
                   {count > 0 ? (
                     <div className="space-y-0.5 text-xs font-black">
-                      <div className="text-emerald-950 font-black">20kg {sched.qty20kg}박스</div>
+                      {(sched.eventQty20kg ?? 0) > 0 ? (
+                        <>
+                          <div className="text-emerald-950 font-black">일반 {sched.normalQty20kg ?? 0}박스</div>
+                          <div className="text-purple-800 font-black bg-purple-100 px-1 py-0.2 rounded-xs flex items-center justify-center gap-0.5" title={`${sched.eventNames?.join(", ") || "임실 김치 축제"} 납품`}>
+                            <span className="text-[10px]">🎪</span>
+                            <span>축제 {sched.eventQty20kg}박스</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-emerald-950 font-black">20kg {sched.qty20kg}박스</div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-xs text-slate-400 py-1 font-medium">
@@ -481,10 +517,47 @@ export function DashboardView({
 
       {/* 5. 선택된 일자 택배 도착 목록 */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
           <h2 className="text-2xl font-black text-slate-900">
             {selectedDate} 택배 도착 목록 ({orders.length}명)
           </h2>
+          {(summary.eventOrdersCount ?? 0) > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => setOrderFilter("ALL")}
+                className={`px-3 py-1 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                  orderFilter === "ALL"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                전체 ({orders.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderFilter("NORMAL")}
+                className={`px-3 py-1 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                  orderFilter === "NORMAL"
+                    ? "bg-emerald-700 text-white shadow-xs"
+                    : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200"
+                }`}
+              >
+                일반 택배 ({orders.length - (summary.eventOrdersCount ?? 0)})
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderFilter("EVENT")}
+                className={`px-3 py-1 rounded-lg text-xs md:text-sm font-black transition-all cursor-pointer flex items-center gap-1 ${
+                  orderFilter === "EVENT"
+                    ? "bg-purple-700 text-white shadow-xs"
+                    : "bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200"
+                }`}
+              >
+                <span>🎪 행사 납품 ({summary.eventOrdersCount})</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {orders.length === 0 ? (
@@ -493,10 +566,30 @@ export function DashboardView({
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
-            {orders.map((ord: any) => (
-              <div key={ord.id} className="py-3 border-b border-slate-200 last:border-0">
+            {orders
+              .filter((ord: any) => {
+                const isEv = ord.order_type === "EVENT" || !!ord.event_name;
+                if (orderFilter === "NORMAL") return !isEv;
+                if (orderFilter === "EVENT") return isEv;
+                return true;
+              })
+              .map((ord: any) => {
+                const isEvent = ord.order_type === "EVENT" || !!ord.event_name;
+                return (
+              <div
+                key={ord.id}
+                className={`py-3 border-b border-slate-200 last:border-0 rounded-xl px-2 transition-colors ${
+                  isEvent ? "bg-purple-50/40 border-purple-200" : ""
+                }`}
+              >
                 {/* 고객 정보 행 */}
                 <div className="flex items-center gap-2 flex-wrap">
+                  {isEvent && (
+                    <span className="shrink-0 px-2 py-0.5 text-xs font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-md inline-flex items-center gap-1">
+                      <span>🎪</span>
+                      <span>{ord.event_name || "임실 김치 축제"}</span>
+                    </span>
+                  )}
                   <span className="text-lg font-extrabold text-slate-900">{ord.customer_name}</span>
                   <PhoneCallLink
                     phone={ord.customer_phone}
@@ -512,7 +605,7 @@ export function DashboardView({
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">{ord.shipping_address} {ord.shipping_address_detail}</div>
                 {/* 상태 + 버튼 행 - 한 줄 유지 */}
-                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto">
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto whitespace-nowrap">
                   <span className={`shrink-0 px-2 py-0.5 text-xs font-bold ${
                     ord.payment_status === "PAID"
                       ? "bg-blue-100 text-blue-900 border border-blue-300"
@@ -547,7 +640,8 @@ export function DashboardView({
                   </button>
                 </div>
               </div>
-            ))}
+                );
+              })}
           </div>
         )}
       </div>

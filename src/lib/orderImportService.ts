@@ -103,6 +103,8 @@ export async function confirmImportedOrder(params: {
   shipping_address: string;
   shipping_address_detail?: string;
   shipping_date: string;
+  order_type?: string;
+  event_name?: string | null;
   items: { product_name: string; weight_kg: number; quantity: number }[];
   memo?: string;
   is_paid?: boolean;
@@ -133,6 +135,8 @@ export async function confirmImportedOrder(params: {
     address: params.shipping_address,
     address_detail: params.shipping_address_detail || "",
     shipping_date: params.shipping_date,
+    order_type: params.order_type,
+    event_name: params.event_name,
     items: orderItemsPayload,
     payment_status: params.is_paid ? "PAID" : "UNPAID",
     memo: params.memo,

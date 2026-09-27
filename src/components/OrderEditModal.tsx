@@ -44,6 +44,9 @@ export function OrderEditModal({
   const [unitPrice, setUnitPrice] = useState(68000);
   const [paymentStatus, setPaymentStatus] = useState<"PAID" | "UNPAID">("UNPAID");
   const [memo, setMemo] = useState("");
+  // 행사·축제 납품 구분 상태
+  const [isEvent, setIsEvent] = useState(false);
+  const [eventName, setEventName] = useState("임실 김치 축제");
   const [isSaving, setIsSaving] = useState(false);
 
   // 저장 완료 후 문자/카톡 발송 여부 확인 팝업 상태
@@ -68,6 +71,8 @@ export function OrderEditModal({
     setShippingDate(order.shipping_date || format(new Date(), "yyyy-MM-dd"));
     setPaymentStatus(order.payment_status === "PAID" ? "PAID" : "UNPAID");
     setMemo(order.memo || "");
+    setIsEvent(order.order_type === "EVENT");
+    setEventName(order.event_name || "임실 김치 축제");
 
     // 수량 파싱: 20kg 아이템이 있으면 그 수량, 없으면 총 금액 기준 역산 또는 1
     let q20 = 1;
@@ -139,6 +144,8 @@ export function OrderEditModal({
         shippingDate: shippingDate,
         shippingAddress: address.trim(),
         shippingAddressDetail: addressDetail.trim(),
+        orderType: isEvent ? "EVENT" : "NORMAL",
+        eventName: isEvent ? (eventName.trim() || "임실 김치 축제") : null,
         items: [
           {
             product_id: 2,
@@ -227,6 +234,70 @@ export function OrderEditModal({
 
         {/* 폼 본문 */}
         <form onSubmit={handleSave} className="p-4 md:p-6 overflow-y-auto space-y-4 flex-1">
+          {/* 주문 구분: 일반 주문 vs 행사·축제 납품 */}
+          <div className="bg-slate-100 p-3.5 rounded-2xl border-2 border-slate-300 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-extrabold text-slate-800">
+                주문 구분 설정
+              </label>
+              {isEvent && (
+                <span className="text-xs font-black text-purple-800 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-full">
+                  🎪 행사 납품 모드
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEvent(false)}
+                className={`py-2 px-3 rounded-xl font-black text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border-2 ${
+                  !isEvent
+                    ? "bg-emerald-700 text-white border-emerald-800 shadow-sm"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <span>📦 일반 고객 주문</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEvent(true)}
+                className={`py-2 px-3 rounded-xl font-black text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border-2 ${
+                  isEvent
+                    ? "bg-purple-700 text-white border-purple-800 shadow-sm ring-2 ring-purple-300"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <span>🎪 행사·축제 납품</span>
+              </button>
+            </div>
+
+            {isEvent && (
+              <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-3 space-y-1.5 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-purple-950">
+                    행사 / 축제 명칭
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setEventName("임실 김치 축제")}
+                    className="text-[11px] font-bold bg-white text-purple-800 border border-purple-300 px-2 py-0.5 rounded-md hover:bg-purple-100 cursor-pointer"
+                  >
+                    + 임실 김치 축제
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={eventName}
+                  onChange={(e) => setEventName(e.target.value)}
+                  placeholder="예: 임실 김치 축제"
+                  className="w-full text-sm font-black border-2 border-purple-400 rounded-lg px-3 py-1.5 bg-white text-purple-950 focus:border-purple-600 focus:outline-hidden"
+                  required={isEvent}
+                />
+              </div>
+            )}
+          </div>
+
           {/* 고객명 & 전화번호 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

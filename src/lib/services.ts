@@ -81,6 +81,8 @@ export async function fetchDashboardService(dateStr: string) {
         o.payment_status,
         o.order_status,
         o.memo,
+        o.order_type,
+        o.event_name,
         s.tracking_no,
         s.status as shipment_status
       FROM orders o
@@ -96,28 +98,47 @@ export async function fetchDashboardService(dateStr: string) {
   const itemsResult = await db.execute({
     sql: `
       SELECT 
+        oi.order_id,
         oi.weight_kg,
-        SUM(oi.quantity) as total_qty,
-        SUM(oi.amount) as total_sum
+        oi.quantity,
+        oi.amount,
+        o.order_type,
+        o.event_name
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
       WHERE o.shipping_date = ?
-      GROUP BY oi.weight_kg
     `,
     args: [dateStr],
   });
 
   let qty10kg = 0;
   let qty20kg = 0;
+  let normalQty20kg = 0;
+  let eventQty20kg = 0;
   let totalWeight = 0;
 
   for (const row of itemsResult.rows) {
     const weight = Number(row.weight_kg);
-    const qty = Number(row.total_qty);
+    const qty = Number(row.quantity);
+    const isEvent = row.order_type === "EVENT";
+
     if (weight === 10) qty10kg += qty;
-    if (weight === 20) qty20kg += qty;
+    if (weight === 20) {
+      qty20kg += qty;
+      if (isEvent) {
+        eventQty20kg += qty;
+      } else {
+        normalQty20kg += qty;
+      }
+    }
     totalWeight += weight * qty;
   }
+
+  const eventOrders = orders.filter((o: any) => o.order_type === "EVENT");
+  const eventOrdersCount = eventOrders.length;
+  const eventNames = Array.from(
+    new Set(eventOrders.map((o: any) => String(o.event_name || "임실 김치 축제")))
+  );
 
   const unpaidResult = await db.execute(`
     SELECT 
@@ -137,6 +158,10 @@ export async function fetchDashboardService(dateStr: string) {
       totalWeight,
       qty10kg,
       qty20kg,
+      normalQty20kg,
+      eventQty20kg,
+      eventOrdersCount,
+      eventNames,
       unpaidCount,
       unpaidTotal,
     },
@@ -151,6 +176,8 @@ export async function createOrderService(data: {
   address: string;
   address_detail?: string;
   shipping_date: string;
+  order_type?: string;
+  event_name?: string | null;
   items: Array<{
     product_id: number;
     product_name: string;
@@ -207,6 +234,8 @@ export async function createOrderService(data: {
   }
 
   const paidAmount = data.payment_status === "PAID" ? totalAmount : 0;
+  const orderType = data.order_type || "NORMAL";
+  const eventName = orderType === "EVENT" ? (data.event_name?.trim() || "임실 김치 축제") : null;
 
   // 3. 주문 등록
   const orderResult = await db.execute({
@@ -214,8 +243,8 @@ export async function createOrderService(data: {
             order_no, customer_id, customer_name, customer_phone,
             shipping_address, shipping_address_detail, order_date,
             shipping_date, total_amount, paid_amount, payment_status,
-            order_status, memo, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?, ?)`,
+            order_status, memo, order_type, event_name, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?, ?, ?, ?)`,
     args: [
       orderNo,
       customerId,
@@ -229,6 +258,8 @@ export async function createOrderService(data: {
       paidAmount,
       data.payment_status,
       data.memo || "",
+      orderType,
+      eventName,
       now,
       now,
     ],
@@ -297,6 +328,8 @@ export async function fetchOrdersService(dateStr: string) {
         o.payment_status,
         o.order_status,
         o.memo,
+        o.order_type,
+        o.event_name,
         s.courier,
         s.tracking_no,
         s.status as shipment_status
@@ -404,6 +437,8 @@ export interface UpdateOrderPayload {
   shippingDate: string;
   shippingAddress: string;
   shippingAddressDetail?: string;
+  orderType?: string;
+  eventName?: string | null;
   items: Array<{
     product_id: number;
     product_name: string;
@@ -425,6 +460,8 @@ export async function updateOrderDetailService(data: UpdateOrderPayload) {
     totalAmount += Number(item.unit_price) * Number(item.quantity);
   }
   const paidAmount = data.paymentStatus === "PAID" ? totalAmount : 0;
+  const orderType = data.orderType || "NORMAL";
+  const eventName = orderType === "EVENT" ? (data.eventName?.trim() || "임실 김치 축제") : null;
 
   // 1. orders 업데이트
   await db.execute({
@@ -438,6 +475,8 @@ export async function updateOrderDetailService(data: UpdateOrderPayload) {
             paid_amount = ?,
             payment_status = ?,
             memo = ?,
+            order_type = ?,
+            event_name = ?,
             updated_at = ?
           WHERE id = ?`,
     args: [
@@ -450,6 +489,8 @@ export async function updateOrderDetailService(data: UpdateOrderPayload) {
       paidAmount,
       data.paymentStatus,
       data.memo || "",
+      orderType,
+      eventName,
       now,
       data.orderId,
     ],
@@ -625,6 +666,10 @@ export interface DayScheduleSummary {
   orderCount: number;
   qty10kg: number;
   qty20kg: number;
+  normalQty20kg: number;
+  eventQty20kg: number;
+  eventOrdersCount: number;
+  eventNames: string[];
   totalWeight: number;
   orders: any[];
 }
@@ -670,22 +715,41 @@ export async function fetchScheduleSummaryService(
   });
 
   const summaryMap: Record<string, DayScheduleSummary> = {};
+  const orderMetaMap: Record<number, { order_type: string; event_name: string }> = {};
 
   // 주문 기본 매핑
   for (const row of ordersResult.rows) {
     const sDate = String(row.shipping_date);
+    const orderId = Number(row.id);
+    const orderType = String(row.order_type || "NORMAL");
+    const eventName = String(row.event_name || "");
+
+    orderMetaMap[orderId] = { order_type: orderType, event_name: eventName };
+
     if (!summaryMap[sDate]) {
       summaryMap[sDate] = {
         date: sDate,
         orderCount: 0,
         qty10kg: 0,
         qty20kg: 0,
+        normalQty20kg: 0,
+        eventQty20kg: 0,
+        eventOrdersCount: 0,
+        eventNames: [],
         totalWeight: 0,
         orders: [],
       };
     }
     summaryMap[sDate].orderCount += 1;
     summaryMap[sDate].orders.push(row);
+
+    if (orderType === "EVENT") {
+      summaryMap[sDate].eventOrdersCount += 1;
+      const cleanEventName = eventName || "임실 김치 축제";
+      if (!summaryMap[sDate].eventNames.includes(cleanEventName)) {
+        summaryMap[sDate].eventNames.push(cleanEventName);
+      }
+    }
   }
 
   // 품목 수량 및 중량 매핑
@@ -697,14 +761,28 @@ export async function fetchScheduleSummaryService(
         orderCount: 0,
         qty10kg: 0,
         qty20kg: 0,
+        normalQty20kg: 0,
+        eventQty20kg: 0,
+        eventOrdersCount: 0,
+        eventNames: [],
         totalWeight: 0,
         orders: [],
       };
     }
     const weight = Number(row.weight_kg);
     const qty = Number(row.quantity);
+    const orderId = Number(row.order_id);
+    const isEvent = orderMetaMap[orderId]?.order_type === "EVENT";
+
     if (weight === 10) summaryMap[sDate].qty10kg += qty;
-    if (weight === 20) summaryMap[sDate].qty20kg += qty;
+    if (weight === 20) {
+      summaryMap[sDate].qty20kg += qty;
+      if (isEvent) {
+        summaryMap[sDate].eventQty20kg += qty;
+      } else {
+        summaryMap[sDate].normalQty20kg += qty;
+      }
+    }
     summaryMap[sDate].totalWeight += weight * qty;
   }
 
@@ -805,6 +883,7 @@ export async function fetchAllOrdersService(opts: {
   dateTo?: string;
   paymentStatus?: "ALL" | "PAID" | "UNPAID";
   orderStatus?: "ALL" | "PENDING" | "PACKED" | "SHIPPED";
+  orderType?: "ALL" | "NORMAL" | "EVENT";
   limit?: number;
   offset?: number;
 } = {}) {
@@ -818,6 +897,7 @@ export async function fetchAllOrdersService(opts: {
     dateTo = "",
     paymentStatus = "ALL",
     orderStatus = "ALL",
+    orderType = "ALL",
     limit = 100,
     offset = 0,
   } = opts;
@@ -848,13 +928,15 @@ export async function fetchAllOrdersService(opts: {
   if (dateTo)   { wheres.push("o.shipping_date <= ?"); args.push(dateTo); }
   if (paymentStatus !== "ALL") { wheres.push("o.payment_status = ?"); args.push(paymentStatus); }
   if (orderStatus !== "ALL")   { wheres.push("o.order_status = ?"); args.push(orderStatus); }
+  if (orderType === "EVENT")   { wheres.push("(o.order_type = 'EVENT' OR (o.event_name IS NOT NULL AND o.event_name != ''))"); }
+  else if (orderType === "NORMAL") { wheres.push("(o.order_type != 'EVENT' OR o.order_type IS NULL) AND (o.event_name IS NULL OR o.event_name = '')"); }
 
   const whereClause = wheres.length ? "WHERE " + wheres.join(" AND ") : "";
 
   const sql = `
     SELECT
       o.id, o.order_no, o.shipping_date, o.payment_status, o.order_status,
-      o.total_amount, s.tracking_no, o.memo,
+      o.total_amount, s.tracking_no, o.memo, o.order_type, o.event_name,
       c.id as customer_id, c.name as customer_name, c.phone as customer_phone,
       c.address as shipping_address, c.address_detail as shipping_address_detail,
       (SELECT GROUP_CONCAT(p.name||' '||oi.quantity||'박스', ', ')

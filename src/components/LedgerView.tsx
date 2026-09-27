@@ -126,6 +126,7 @@ function SalesListTab({ settings }: { settings?: any }) {
 
   const [payFilter, setPayFilter] = useState<"ALL" | "PAID" | "UNPAID">("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "PACKED" | "SHIPPED">("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "NORMAL" | "EVENT">("ALL");
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
 
   const handlePresetChange = (preset: "1week" | "1month" | "1year" | "all") => {
@@ -157,6 +158,7 @@ function SalesListTab({ settings }: { settings?: any }) {
         dateTo,
         paymentStatus: payFilter,
         orderStatus: statusFilter,
+        orderType: typeFilter,
         limit: 200,
       });
       setOrders(res.orders as any[]);
@@ -170,7 +172,7 @@ function SalesListTab({ settings }: { settings?: any }) {
     } finally {
       setLoading(false);
     }
-  }, [search, searchType, dateFrom, dateTo, payFilter, statusFilter]);
+  }, [search, searchType, dateFrom, dateTo, payFilter, statusFilter, typeFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -283,6 +285,16 @@ function SalesListTab({ settings }: { settings?: any }) {
               <option value="SHIPPED">발송완료</option>
             </select>
 
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as any)}
+              className="border-2 border-slate-300 px-2 py-2 text-sm font-bold focus:border-emerald-500 focus:outline-none bg-white"
+            >
+              <option value="ALL">구분 전체</option>
+              <option value="NORMAL">일반 택배</option>
+              <option value="EVENT">🎪 행사 납품</option>
+            </select>
+
             <button
               onClick={load}
               title="새로고침"
@@ -387,10 +399,21 @@ function SalesListTab({ settings }: { settings?: any }) {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o, idx) => (
+                {orders.map((o, idx) => {
+                  const isEv = o.order_type === "EVENT" || !!o.event_name;
+                  return (
                   <tr key={o.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
                     <td className="px-3 py-2.5 font-bold text-slate-700 whitespace-nowrap">{o.shipping_date}</td>
-                    <td className="px-3 py-2.5 font-extrabold text-slate-900 whitespace-nowrap">{o.customer_name}</td>
+                    <td className="px-3 py-2.5 font-extrabold text-slate-900 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 flex-nowrap">
+                        {isEv && (
+                          <span className="shrink-0 px-1.5 py-0.5 text-[11px] font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-sm whitespace-nowrap">
+                            🎪 {o.event_name || "행사납품"}
+                          </span>
+                        )}
+                        <span>{o.customer_name}</span>
+                      </div>
+                    </td>
                     <td className="px-3 py-2.5 text-emerald-800 font-bold whitespace-nowrap">
                       <PhoneCallLink phone={o.customer_phone} name={o.customer_name} />
                     </td>
@@ -433,7 +456,8 @@ function SalesListTab({ settings }: { settings?: any }) {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -461,6 +485,8 @@ function SalesListTab({ settings }: { settings?: any }) {
             total_amount: Number(editingOrder.total_amount) || 0,
             payment_status: editingOrder.payment_status || "UNPAID",
             memo: editingOrder.memo || "",
+            order_type: editingOrder.order_type || (editingOrder.event_name ? "EVENT" : "NORMAL"),
+            event_name: editingOrder.event_name || "",
             items: [],
           }}
           isOpen={!!editingOrder}
