@@ -188,18 +188,12 @@ function renderJangmonimTemplateCard(
   // ==========================================
   // [4행] 연락처: 010-XXXX-XXXX (원래 위치 y=695)
   // ==========================================
-  const phoneText = data.shopPhone || "010-8452-9988";
-  ctx.font = `900 26px ${FONT_FAMILY}`;
+  const phoneText = data.shopPhone || "010-7180-2496";
+  const extraPhoneText = data.extraPhones && data.extraPhones.length > 0 ? data.extraPhones[0].phone : "";
+  const displayPhone = extraPhoneText ? `${phoneText} / ${extraPhoneText}` : phoneText;
+  ctx.font = `900 ${extraPhoneText ? 21 : 26}px ${FONT_FAMILY}`;
   ctx.fillStyle = "#0F172A";
-  ctx.fillText(phoneText, 258, 695);
-
-  if (data.extraPhones && data.extraPhones.length > 0) {
-    const extra = data.extraPhones[0];
-    const phoneWidth = ctx.measureText(phoneText).width;
-    ctx.font = `700 16px ${FONT_FAMILY}`;
-    ctx.fillStyle = "#475569";
-    ctx.fillText(`(${extra.label}: ${extra.phone})`, 258 + phoneWidth + 10, 695);
-  }
+  ctx.fillText(displayPhone, 258, 695);
 
   // ==========================================
   // [5행] 계좌번호: 은행명 계좌번호 / (예금주: OOO) (원래 위치 y=750)

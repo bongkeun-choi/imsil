@@ -4,8 +4,8 @@
 
 export interface ExtraPhone {
   id: string;
-  label: string; // 예: "배송문의", "농장직통", "사모님", "관리자"
-  phone: string; // 예: "010-1234-5678"
+  phone: string;
+  label?: string;
 }
 
 export interface OrderShareSourceData {
@@ -20,8 +20,8 @@ export interface OrderShareSourceData {
   paymentStatus: "PAID" | "UNPAID" | string;
   memo?: string;
   shopName: string;
-  shopPhone: string; // 대표 연락처
-  extraPhones?: ExtraPhone[]; // 추가 연락처 목록
+  shopPhone: string; // 기본 대표 연락처
+  extraPhones?: ExtraPhone[]; // 추가된 대표 연락처 목록
   bankName: string;
   bankAccount: string;
   ownerName: string;
@@ -45,8 +45,8 @@ export const DEFAULT_SHARE_MESSAGE_TEMPLATE = `[{농가명} 주문 접수 안내
 {입금계좌안내}
 ■ 농가 문의처
 • 농가명: {농가명}
-• 대표전화: {대표전화}
-{추가연락처}
+• 문의전화: {대표전화}
+
 신선하고 깨끗한 절임배추로 엄선하여 안전하게 배송해 드리겠습니다. 감사합니다!`;
 
 export interface TemplateVariableInfo {
@@ -64,29 +64,37 @@ export const AVAILABLE_TEMPLATE_VARIABLES: TemplateVariableInfo[] = [
   { tag: "{결제금액}", description: "총 결제금액 (원)", example: "136,000" },
   { tag: "{입금상태}", description: "입금 확인 완료 / 입금 대기중", example: "입금 대기중" },
   { tag: "{입금계좌안내}", description: "입금상태별 계좌·예금주 안내 블록", example: "• 입금계좌: [농협] 351-0000...\n• 예금주: OOO" },
-  { tag: "{입금계좌}", description: "은행명 + 계좌번호 + 예금주 한 줄", example: "[농협] 351-0000-0000-00 (예금주: 홍길동)" },
+  { tag: "{입금계좌}", description: "은행명 + 계좌번호 + 예금주 한 줄", example: "[농협] 351-0000-0000-00 (예금주: 백양임)" },
   { tag: "{은행명}", description: "입금 은행명", example: "농협" },
   { tag: "{계좌번호}", description: "입금 계좌번호", example: "351-0000-0000-00" },
-  { tag: "{예금주}", description: "계좌 예금주", example: "대표자" },
-  { tag: "{농가명}", description: "농가/상호명", example: "임실참배추농원" },
-  { tag: "{대표전화}", description: "실제 대표 연락처", example: "010-8452-9988" },
-  { tag: "{추가연락처}", description: "추가 연락처 목록 (있을 시)", example: "• 배송문의: 010-1234-5678" },
-  { tag: "{연락처목록}", description: "대표전화 및 추가연락처 전체", example: "• 대표전화: 010-8452-9988\n• 배송문의: 010-1234-5678" },
+  { tag: "{예금주}", description: "계좌 예금주", example: "백양임" },
+  { tag: "{농가명}", description: "농가/상호명", example: "장모님 절임배추" },
+  { tag: "{대표전화}", description: "대표 연락처 전체", example: "010-7180-2496, 010-XXXX-XXXX" },
 ];
 
 /**
- * 추가 연락처 JSON 파싱 헬퍼
+ * 추가 대표 연락처 JSON 파싱 헬퍼 (단순 전화번호 목록 지원)
  */
 export function parseExtraPhones(raw: any): ExtraPhone[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
-    return raw.filter((p) => p && typeof p === "object" && p.phone);
+    return raw
+      .map((item, idx) => {
+        if (typeof item === "string" && item.trim()) {
+          return { id: `phone-${idx}-${item}`, phone: item.trim() };
+        }
+        if (item && typeof item === "object" && item.phone) {
+          return { id: item.id || `phone-${idx}`, phone: String(item.phone).trim() };
+        }
+        return null;
+      })
+      .filter((p): p is ExtraPhone => p !== null && p.phone !== "");
   }
   if (typeof raw === "string") {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed.filter((p) => p && typeof p === "object" && p.phone);
+        return parseExtraPhones(parsed);
       }
     } catch (_) {
       return [];
@@ -105,22 +113,27 @@ export function generateOrderShareMessage(
   const isPaid = data.paymentStatus === "PAID";
   const formattedAmount = (data.totalAmount || 0).toLocaleString();
   const fullAddress = `${data.shippingAddress || ""} ${data.shippingAddressDetail || ""}`.trim();
-  const shopName = data.shopName || "임실참배추농원";
-  const shopPhone = data.shopPhone || "010-0000-0000";
+  const shopName = data.shopName || "장모님 절임배추";
+  const mainPhone = data.shopPhone || "010-7180-2496";
   const bankName = data.bankName || "농협";
   const bankAccount = data.bankAccount || "";
   const ownerName = data.ownerName || "";
 
-  // 추가 연락처 포맷팅
-  const extraPhones = data.extraPhones || [];
-  const extraPhonesText = extraPhones
-    .map((p) => `• ${p.label || "추가연락처"}: ${p.phone}`)
-    .join("\n");
+  // 등록된 모든 대표 연락처 번호 모음 (기본 번호 + 추가된 대표 번호들)
+  const extraPhones = (data.extraPhones || []).filter((p) => p && p.phone && p.phone.trim() !== "");
+  const allPhonesList = [mainPhone, ...extraPhones.map((p) => p.phone.trim())].filter(Boolean);
+  
+  // 대표 연락처 텍스트 (예: 010-7180-2496, 010-1234-5678)
+  const allPhonesJoined = allPhonesList.join(", ");
 
-  const allContactsText = [
-    `• 대표전화: ${shopPhone}`,
-    ...extraPhones.map((p) => `• ${p.label || "추가연락처"}: ${p.phone}`),
-  ].join("\n");
+  // 추가 대표 연락처 목록 텍스트 (있을 경우)
+  const extraPhonesText = extraPhones.length > 0
+    ? extraPhones.map((p, idx) => `• 대표전화 ${idx + 2}: ${p.phone}`).join("\n")
+    : "";
+
+  const allContactsText = allPhonesList.length > 1
+    ? allPhonesList.map((p, idx) => `• 대표전화 ${idx + 1}: ${p}`).join("\n")
+    : `• 대표전화: ${mainPhone}`;
 
   // 입금 계좌 안내 블록 생성
   let paymentGuideBlock = "";
@@ -149,7 +162,7 @@ export function generateOrderShareMessage(
     계좌번호: bankAccount,
     예금주: ownerName,
     농가명: shopName,
-    대표전화: shopPhone,
+    대표전화: allPhonesJoined,
     추가연락처: extraPhonesText ? extraPhonesText + "\n" : "",
     연락처목록: allContactsText,
   };
@@ -159,23 +172,9 @@ export function generateOrderShareMessage(
     const braceRegex = new RegExp(`\\{${key}\\}`, "g");
     const bracketRegex = new RegExp(`\\[${key}\\]`, "g");
     template = template.replace(braceRegex, val);
-    // [농가명] 같은 경우 기본 템플릿의 "[{농가명} 주문 접수 안내]" 등과 겹칠 수 있으므로 정밀 치환
     if (key !== "농가명") {
       template = template.replace(bracketRegex, val);
     }
-  }
-
-  // 템플릿에 추가연락처가 누락되었으나 실제 추가연락처가 등록되어 있는 경우
-  // 대표전화 다음 줄에 자동으로 추가연락처 추가
-  if (
-    extraPhonesText &&
-    !template.includes(extraPhones[0].phone) &&
-    template.includes(shopPhone)
-  ) {
-    template = template.replace(
-      shopPhone,
-      `${shopPhone}\n${extraPhonesText}`
-    );
   }
 
   return template.trim();

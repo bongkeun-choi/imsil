@@ -60,8 +60,8 @@ export function ShipmentPrintModal({
   const shopPhone = settings.shop_phone || "";
   const extraPhones = parseExtraPhones(settings.extra_phones);
   const contactsDisplay = [
-    shopPhone ? `대표: ${shopPhone}` : "",
-    ...extraPhones.map((p) => `${p.label}: ${p.phone}`),
+    shopPhone,
+    ...extraPhones.map((p) => p.phone),
   ]
     .filter(Boolean)
     .join("&nbsp;&nbsp;|&nbsp;&nbsp;");

@@ -14,7 +14,6 @@ import {
   Sparkles,
   Eye,
   CheckCircle2,
-  Info,
 } from "lucide-react";
 import { fetchSettingsService, saveSettingsService } from "@/lib/services";
 import {
@@ -29,13 +28,12 @@ interface SettingsViewProps {
   onSettingsUpdated: () => void;
 }
 
-const QUICK_PHONE_LABELS = ["배송문의", "농장직통", "사모님", "관리자", "작업장"];
-
 export function SettingsView({
   onSettingsUpdated,
 }: SettingsViewProps) {
   const [shopName, setShopName] = useState("");
   const [shopPhone, setShopPhone] = useState("");
+  // 추가 대표 연락처 목록 (단순 개수 확장)
   const [extraPhones, setExtraPhones] = useState<ExtraPhone[]>([]);
   const [shareMessageTemplate, setShareMessageTemplate] = useState(DEFAULT_SHARE_MESSAGE_TEMPLATE);
 
@@ -61,11 +59,11 @@ export function SettingsView({
     fetchSettingsService()
       .then((data) => {
         if (data.settings) {
-          setShopName(data.settings.shop_name || "임실 절임배추");
-          setShopPhone(data.settings.shop_phone || "010-0000-0000");
+          setShopName(data.settings.shop_name || "장모님 절임배추");
+          setShopPhone(data.settings.shop_phone || "010-7180-2496");
           setBankName(data.settings.bank_name || "농협");
           setBankAccount(data.settings.bank_account || "351-0000-0000-00");
-          setOwnerName(data.settings.owner_name || "대표자");
+          setOwnerName(data.settings.owner_name || "백양임");
           setDefaultCourier(data.settings.default_courier || "우체국택배");
           
           if (data.settings.extra_phones) {
@@ -97,26 +95,25 @@ export function SettingsView({
       .finally(() => setLoading(false));
   }, []);
 
-  // 추가 연락처 추가
-  const handleAddExtraPhone = (defaultLabel = "") => {
+  // 대표 연락처 추가 (단순 전화번호 입력란 1줄 추가)
+  const handleAddExtraPhone = () => {
     setExtraPhones((prev) => [
       ...prev,
       {
         id: "phone-" + Date.now() + "-" + Math.random().toString(36).slice(2, 6),
-        label: defaultLabel || "",
         phone: "",
       },
     ]);
   };
 
-  // 추가 연락처 수정
-  const handleUpdateExtraPhone = (id: string, field: "label" | "phone", value: string) => {
+  // 대표 연락처 번호 수정
+  const handleUpdateExtraPhone = (id: string, phoneValue: string) => {
     setExtraPhones((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+      prev.map((item) => (item.id === id ? { ...item, phone: phoneValue } : item))
     );
   };
 
-  // 추가 연락처 삭제
+  // 대표 연락처 삭제
   const handleRemoveExtraPhone = (id: string) => {
     setExtraPhones((prev) => prev.filter((item) => item.id !== id));
   };
@@ -157,9 +154,9 @@ export function SettingsView({
     e.preventDefault();
     setSaving(true);
     try {
-      // 빈 추가 연락처 필터링
+      // 빈 번호 필터링
       const validExtraPhones = extraPhones.filter(
-        (p) => p.phone.trim() !== "" || p.label.trim() !== ""
+        (p) => p.phone && p.phone.trim() !== ""
       );
 
       await saveSettingsService(
@@ -179,7 +176,7 @@ export function SettingsView({
         ].filter((p) => p.id !== null)
       );
 
-      alert("농가 정보, 대표/추가 연락처 및 카톡·문자 발송 문구가 성공적으로 저장되었습니다.");
+      alert("농가 정보, 대표 연락처 및 카톡·문자 발송 문구가 성공적으로 저장되었습니다.");
       onSettingsUpdated();
     } catch (e: any) {
       alert("저장 실패: " + e.message);
@@ -200,12 +197,12 @@ export function SettingsView({
     totalAmount: price20kg * 2,
     paymentStatus: previewTab === "paid" ? "PAID" : "UNPAID",
     memo: "경비실에 맡겨주세요",
-    shopName: shopName || "임실참배추농원",
-    shopPhone: shopPhone || "010-8452-9988",
+    shopName: shopName || "장모님 절임배추",
+    shopPhone: shopPhone || "010-7180-2496",
     extraPhones: extraPhones.filter((p) => p.phone.trim() !== ""),
     bankName: bankName || "농협",
     bankAccount: bankAccount || "351-0000-0000-00",
-    ownerName: ownerName || "대표자",
+    ownerName: ownerName || "백양임",
   };
 
   const previewMessageText = generateOrderShareMessage(
@@ -221,6 +218,8 @@ export function SettingsView({
     );
   }
 
+  const totalPhoneCount = 1 + extraPhones.length;
+
   return (
     <div className="max-w-4xl mx-auto pb-24 space-y-6">
       {/* 상단 타이틀 */}
@@ -231,7 +230,7 @@ export function SettingsView({
               시스템 환경 설정
             </h1>
             <p className="text-sm text-slate-500 font-semibold mt-1">
-              농가 상호, 실제 대표/추가 연락처 및 고객 문자·카톡 발송 문구를 설정합니다.
+              농가 상호, 실제 대표 연락처(단순 개수 추가) 및 카톡·문자 발송 문구를 설정합니다.
             </p>
           </div>
           <button
@@ -246,145 +245,105 @@ export function SettingsView({
         </div>
 
         <form onSubmit={handleSave} className="space-y-8">
-          {/* 1. 상호명 및 실제 대표/추가 연락처 설정 */}
+          {/* 1. 상호명 및 실제 대표 연락처 관리 (단순 개수 확장) */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 md:p-6 space-y-5">
-            <div className="border-b border-slate-200 pb-3">
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
-                <Phone className="w-6 h-6 text-emerald-700" />
-                <span>농가 상호 및 연락처 관리</span>
-              </h2>
-              <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
-                실제 대표 연락처와 추가 연락처를 등록하여 문자·카톡 및 영수증 카드에 맞춤 표기합니다.
-              </p>
+            <div className="border-b border-slate-200 pb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
+                  <Phone className="w-6 h-6 text-emerald-700" />
+                  <span>농가 상호 및 대표 연락처</span>
+                </h2>
+                <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
+                  대표 연락처를 필요하신 만큼 자유롭게 추가 등록할 수 있습니다.
+                </p>
+              </div>
+              <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full whitespace-nowrap">
+                총 {totalPhoneCount}개 연락처 등록됨
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-base font-bold text-slate-800 mb-1">
-                  농가 상호명 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={shopName}
-                  onChange={(e) => setShopName(e.target.value)}
-                  placeholder="예: 임실 절임배추"
-                  className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-4 py-2.5 bg-white focus:border-emerald-600 focus:outline-hidden"
-                  required
-                />
-              </div>
+            {/* 농가 상호명 */}
+            <div>
+              <label className="block text-base font-bold text-slate-800 mb-1">
+                농가 상호명 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+                placeholder="예: 장모님 절임배추"
+                className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-4 py-2.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                required
+              />
+            </div>
 
-              <div>
-                <label className="block text-base font-bold text-emerald-950 mb-1 flex items-center justify-between">
-                  <span>
-                    실제 대표 전화번호 (대표 연락처) <span className="text-red-500">*</span>
-                  </span>
-                  <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    기본 대표
-                  </span>
-                </label>
+            {/* 대표 연락처 목록 (단순 개수 확장) */}
+            <div className="space-y-3 pt-2">
+              <label className="block text-base font-bold text-emerald-950">
+                대표 연락처 (전화번호) <span className="text-red-500">*</span>
+              </label>
+
+              {/* 1번 메인 대표 연락처 */}
+              <div className="flex items-center gap-2 bg-white p-3 rounded-xl border-2 border-emerald-500 shadow-2xs">
+                <span className="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-md shrink-0 whitespace-nowrap">
+                  대표 연락처 1 (기본)
+                </span>
                 <input
                   type="text"
                   value={shopPhone}
                   onChange={(e) => setShopPhone(e.target.value)}
-                  placeholder="예: 010-8452-9988"
-                  className="w-full text-lg font-bold border-2 border-emerald-500 rounded-xl px-4 py-2.5 bg-white focus:border-emerald-700 focus:outline-hidden text-emerald-950"
+                  placeholder="예: 010-7180-2496"
+                  className="flex-1 text-base md:text-lg font-bold border-0 bg-transparent px-2 py-1 text-emerald-950 focus:outline-hidden"
                   required
                 />
-                <p className="text-xs text-slate-500 mt-1 font-medium">
-                  ※ 고객 주문 접수 문자, 영수증 카드의 최우선 대표 번호로 적용됩니다.
-                </p>
               </div>
-            </div>
 
-            {/* 추가 연락처 관리 */}
-            <div className="pt-2 border-t border-slate-200 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
-                    <span>추가 연락처 목록</span>
-                    <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
-                      {extraPhones.length}개 등록됨
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium">
-                    배송 담당자, 농장 직통, 가족/관리자 등 추가 안내할 번호를 등록할 수 있습니다.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {QUICK_PHONE_LABELS.map((lbl) => (
-                    <button
-                      key={lbl}
-                      type="button"
-                      onClick={() => handleAddExtraPhone(lbl)}
-                      className="text-xs font-bold text-slate-700 bg-white hover:bg-emerald-50 hover:text-emerald-800 border border-slate-300 hover:border-emerald-300 px-2.5 py-1 rounded-lg cursor-pointer transition-colors whitespace-nowrap"
-                    >
-                      + {lbl}
-                    </button>
-                  ))}
+              {/* 추가된 대표 연락처 목록 (단순 2, 3, 4...) */}
+              {extraPhones.map((item, idx) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 bg-white p-3 rounded-xl border-2 border-slate-300 shadow-2xs animate-in fade-in duration-100"
+                >
+                  <span className="text-xs font-black text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md shrink-0 whitespace-nowrap">
+                    대표 연락처 {idx + 2}
+                  </span>
+                  <input
+                    type="text"
+                    value={item.phone}
+                    onChange={(e) =>
+                      handleUpdateExtraPhone(item.id, e.target.value)
+                    }
+                    placeholder={`예: 010-0000-0000`}
+                    className="flex-1 text-base md:text-lg font-bold border-0 bg-transparent px-2 py-1 text-slate-900 focus:outline-hidden"
+                  />
                   <button
                     type="button"
-                    onClick={() => handleAddExtraPhone("")}
-                    className="text-xs font-black text-white bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
+                    onClick={() => handleRemoveExtraPhone(item.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
+                    title="연락처 삭제"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>연락처 직접 추가</span>
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
-              </div>
+              ))}
 
-              {extraPhones.length === 0 ? (
-                <div className="bg-white border border-dashed border-slate-300 rounded-xl p-4 text-center text-slate-500 text-sm font-medium">
-                  등록된 추가 연락처가 없습니다. 상단의 <strong>[+ 배송문의]</strong> 또는 <strong>[연락처 직접 추가]</strong> 버튼으로 추가해 보세요.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {extraPhones.map((item, idx) => (
-                    <div
-                      key={item.id}
-                      className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-300 shadow-2xs animate-in fade-in duration-100"
-                    >
-                      <span className="text-xs font-black text-slate-400 w-5 text-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="w-full sm:w-36 shrink-0">
-                        <input
-                          type="text"
-                          value={item.label}
-                          onChange={(e) =>
-                            handleUpdateExtraPhone(item.id, "label", e.target.value)
-                          }
-                          placeholder="구분 (예: 배송문의)"
-                          className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-hidden"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-[180px]">
-                        <input
-                          type="text"
-                          value={item.phone}
-                          onChange={(e) =>
-                            handleUpdateExtraPhone(item.id, "phone", e.target.value)
-                          }
-                          placeholder="전화번호 (예: 010-1234-5678)"
-                          className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-2 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:outline-hidden"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExtraPhone(item.id)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer shrink-0"
-                        title="연락처 삭제"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* 대표 연락처 추가 버튼 */}
+              <button
+                type="button"
+                onClick={handleAddExtraPhone}
+                className="w-full py-3 bg-white hover:bg-emerald-50 text-emerald-800 hover:text-emerald-900 border-2 border-dashed border-emerald-400 hover:border-emerald-600 rounded-xl font-bold text-sm md:text-base flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-2xs"
+              >
+                <Plus className="w-4 h-4 text-emerald-600" />
+                <span>+ 대표 연락처 추가하기</span>
+              </button>
+
+              <p className="text-xs text-slate-500 font-medium px-1">
+                ※ 대표 연락처를 추가하시면 문자·카톡의 문의전화 및 주문 카드에 함께 등록됩니다. (예: {shopPhone || "010-7180-2496"}{extraPhones[0]?.phone ? `, ${extraPhones[0].phone}` : ""})
+              </p>
             </div>
           </div>
 
-          {/* 2. 카톡 / 문자 발송 문구 설정 (핵심 신규 기능) */}
+          {/* 2. 카톡 / 문자 발송 문구 설정 */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 md:p-6 space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
               <div>
@@ -442,7 +401,7 @@ export function SettingsView({
                 ))}
               </div>
               <p className="text-[11px] text-slate-400 font-medium">
-                💡 팁: <strong>{`{입금계좌안내}`}</strong>를 넣으면 고객의 입금 여부에 따라 계좌번호 안내 또는 입금 확인 문구가 자동으로 교체됩니다.
+                💡 팁: <strong>{`{대표전화}`}</strong>를 넣으면 등록된 대표 연락처들이 자동으로 연결되어 표시됩니다.
               </p>
             </div>
 
@@ -504,7 +463,7 @@ export function SettingsView({
                     {previewMessageText}
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium px-1">
-                    ※ 상호명, 실제 대표/추가 연락처, 계좌정보를 위에서 수정하면 실시간 반영됩니다.
+                    ※ 상호명, 대표 연락처 목록, 계좌정보를 위에서 수정하면 실시간 반영됩니다.
                   </p>
                 </div>
               )}
@@ -541,7 +500,7 @@ export function SettingsView({
                   type="text"
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
-                  placeholder="예: 홍길동"
+                  placeholder="예: 백양임"
                   className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-4 py-2.5 bg-white focus:border-emerald-600 focus:outline-hidden"
                   required
                 />
