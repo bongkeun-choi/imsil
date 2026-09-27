@@ -660,48 +660,7 @@ export function NewOrderView({
                 />
               </div>
 
-              {/* 행사 축제용 연락처/주소 불필요 안내 및 선택 입력 박스 */}
-              <div className="bg-purple-50/80 border-2 border-purple-300 rounded-2xl p-4.5 text-purple-950 space-y-2.5">
-                <div className="flex items-center gap-2 font-black text-base md:text-lg text-purple-900">
-                  <span className="text-xl">🎪</span>
-                  <span>행사 현장 직납 (전화번호 및 택배 주소 입력 필요 없음)</span>
-                </div>
-                <p className="text-xs md:text-sm text-purple-800 font-semibold leading-relaxed">
-                  행사·축제 물량은 현장으로 직접 운송되므로 일반 고객 연락처나 택배 배송지 주소를 입력하지 않고 바로 등록하실 수 있습니다.
-                </p>
 
-                <details className="pt-1">
-                  <summary className="text-xs md:text-sm font-black text-purple-700 hover:text-purple-900 cursor-pointer select-none">
-                    + 필요 시 현장 담당자 연락처나 납품 위치 메모 적기 (선택사항)
-                  </summary>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 pt-3 border-t border-purple-200">
-                    <div>
-                      <label className="block text-xs font-bold text-purple-900 mb-1">
-                        현장 담당자 연락처 (선택)
-                      </label>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(formatPhone(e.target.value))}
-                        placeholder="예: 010-0000-0000"
-                        className="w-full text-base font-bold border border-purple-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:border-purple-600 focus:outline-hidden"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-purple-900 mb-1">
-                        현장 납품 위치 / 부스 메모 (선택)
-                      </label>
-                      <input
-                        type="text"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        placeholder="예: 종합안내소 옆 천막"
-                        className="w-full text-base font-bold border border-purple-300 rounded-lg px-3 py-2 bg-white text-slate-900 focus:border-purple-600 focus:outline-hidden"
-                      />
-                    </div>
-                  </div>
-                </details>
-              </div>
             </div>
           ) : (
             <div className="space-y-4">
@@ -875,14 +834,11 @@ export function NewOrderView({
 
           {/* 택배 도착 희망일 (배추 받는 날) 선택 */}
           <div className="bg-emerald-50/60 border-2 border-emerald-400 rounded-2xl p-5 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-1">
+            <div>
               <label className="text-xl font-black text-slate-900 flex items-center gap-1.5">
                 <span>택배 도착 희망일 (배추 받는 날)</span>
                 <span className="text-red-600">*</span>
               </label>
-              <span className="text-xs md:text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-md">
-                김장 전날 수령 기준
-              </span>
             </div>
             <p className="text-sm font-semibold text-slate-600">
               고객이 김치 담그기 전날 수령할 날짜를 선택합니다.
