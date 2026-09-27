@@ -385,27 +385,27 @@ export function NewOrderView({
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-24 space-y-6">
+    <div className="max-w-4xl mx-auto pb-16 space-y-3.5">
       {/* ────────────────────────────────────────────────────────── */}
       {/* 1. 상단 스마트 문자·사진 자동 입력 카드 (통합 프레임) */}
       {/* ────────────────────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border-2 border-emerald-500 shadow-sm p-5 md:p-7 space-y-4">
-        <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+      <div className="bg-white rounded-2xl border-2 border-emerald-500 shadow-sm p-3 md:p-4 space-y-2.5">
+        <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-emerald-300" />
+            <div className="w-7 h-7 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-emerald-300" />
             </div>
             <div>
-              <h2 className="text-xl md:text-2xl font-black text-slate-900">
+              <h2 className="text-lg md:text-xl font-black text-slate-900 leading-tight">
                 문자·사진으로 3초 자동 입력
               </h2>
-              <p className="text-xs md:text-sm text-slate-600">
+              <p className="text-xs text-slate-600">
                 받으신 문자를 붙여넣거나 사진을 올리면, 아래 주문서에 자동으로 입력됩니다.
               </p>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 shrink-0">
             <button
               type="button"
               onClick={() => {
@@ -413,7 +413,7 @@ export function NewOrderView({
                 setSmsText(sample1);
                 handleAnalyzeSms(sample1);
               }}
-              className="text-xs px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-md font-bold cursor-pointer border border-emerald-200"
+              className="text-xs px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-md font-bold cursor-pointer border border-emerald-200 whitespace-nowrap"
             >
               예시 1 테스트
             </button>
@@ -424,7 +424,7 @@ export function NewOrderView({
                 setSmsText(sample2);
                 handleAnalyzeSms(sample2);
               }}
-              className="text-xs px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-md font-bold cursor-pointer border border-amber-200"
+              className="text-xs px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-md font-bold cursor-pointer border border-amber-200 whitespace-nowrap"
             >
               예시 2 (작년처럼)
             </button>
@@ -432,21 +432,21 @@ export function NewOrderView({
         </div>
 
         {/* 사진 업로드 버튼 2종 */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => cameraInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-sm md:text-base cursor-pointer transition-colors"
+            className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl border-2 border-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-sm cursor-pointer transition-colors whitespace-nowrap"
           >
-            <Camera className="w-5 h-5 text-emerald-700" />
+            <Camera className="w-4 h-4 text-emerald-700 shrink-0" />
             <span>카메라 촬영</span>
           </button>
           <button
             type="button"
             onClick={() => galleryInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-blue-600 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-sm md:text-base cursor-pointer transition-colors"
+            className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl border-2 border-blue-600 bg-blue-50 hover:bg-blue-100 text-blue-900 font-bold text-sm cursor-pointer transition-colors whitespace-nowrap"
           >
-            <ImageIcon className="w-5 h-5 text-blue-700" />
+            <ImageIcon className="w-4 h-4 text-blue-700 shrink-0" />
             <span>문자 캡처 사진</span>
           </button>
 
@@ -474,29 +474,29 @@ export function NewOrderView({
         </div>
 
         {/* 문자 텍스트 붙여넣기 박스 */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <textarea
-            rows={3}
+            rows={2}
             value={smsText}
             onChange={(e) => setSmsText(e.target.value)}
             placeholder="문자 내용을 여기에 길게 눌러 [붙여넣기] 하세요...&#10;예: 전주시 완산구 고사동 303-3 배추 10키로 2박스 010-6615-776 최봉근"
-            className="w-full p-3.5 border-2 border-slate-300 rounded-xl text-base text-slate-900 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
+            className="w-full px-3 py-1.5 border-2 border-slate-300 rounded-xl text-sm md:text-base text-slate-900 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
           />
 
           <button
             type="button"
             onClick={() => handleAnalyzeSms()}
             disabled={isAnalyzing}
-            className="w-full py-3.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-lg font-black flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-base font-black flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-50 whitespace-nowrap"
           >
             {isAnalyzing ? (
               <>
-                <RefreshCw className="w-5 h-5 animate-spin" />
+                <RefreshCw className="w-4 h-4 animate-spin shrink-0" />
                 <span>문자 분석 중 ({analysisProgress?.message || "잠시만 기다려주세요..."})</span>
               </>
             ) : (
               <>
-                <Sparkles className="w-5 h-5 text-emerald-300" />
+                <Sparkles className="w-4 h-4 text-emerald-300 shrink-0" />
                 <span>문자 분석하여 아래 양식에 자동 채우기</span>
               </>
             )}
@@ -505,34 +505,34 @@ export function NewOrderView({
 
         {/* 분석 완료 시 알림 & 안내 배너 */}
         {autoFilledNotice && analysisResult && (
-          <div className="space-y-2.5 pt-2">
+          <div className="space-y-1.5 pt-1">
             {/* 1. 자동 채움 완료 성공 알림 */}
-            <div className="p-3 bg-emerald-50 border-2 border-emerald-400 rounded-xl text-emerald-950 flex items-center gap-2 text-sm md:text-base font-bold">
-              <CheckCircle2 className="w-5 h-5 text-emerald-700 shrink-0" />
+            <div className="p-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl text-emerald-950 flex items-center gap-1.5 text-xs md:text-sm font-bold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
               <span>문자 내용을 분석하여 아래 주문서에 자동 입력했습니다. 확인 후 등록하세요!</span>
             </div>
 
             {/* 2. 중복 검사 결과 알림 */}
             {analysisResult.duplicate_check.decision === "DUPLICATE" ? (
-              <div className="p-3.5 rounded-xl border-2 border-red-500 bg-red-50 text-red-950 flex items-start gap-2.5 text-sm">
-                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="p-2 rounded-xl border-2 border-red-500 bg-red-50 text-red-950 flex items-start gap-2 text-xs md:text-sm">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                 <div>
                   <span className="font-black text-red-700">중복 주문 주의!</span>
                   <p className="mt-0.5">{analysisResult.duplicate_check.reason}</p>
                 </div>
               </div>
             ) : analysisResult.duplicate_check.decision === "POSSIBLE_DUPLICATE" ? (
-              <div className="p-3 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-950 flex items-center gap-2 text-sm">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+              <div className="p-2 rounded-xl border-2 border-amber-500 bg-amber-50 text-amber-950 flex items-center gap-2 text-xs md:text-sm">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                 <span>확인 필요: {analysisResult.duplicate_check.reason}</span>
               </div>
             ) : null}
 
             {/* 3. 기존 단골 고객 발견 알림 & 과거 배송지 적용 버튼 */}
             {analysisResult.customer_match && (
-              <div className="p-3.5 rounded-xl border-2 border-blue-400 bg-blue-50 text-blue-950 flex items-center justify-between gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-blue-700 shrink-0" />
+              <div className="p-2 rounded-xl border-2 border-blue-400 bg-blue-50 text-blue-950 flex items-center justify-between gap-2 text-xs md:text-sm">
+                <div className="flex items-center gap-1.5">
+                  <UserCheck className="w-4 h-4 text-blue-700 shrink-0" />
                   <span>
                     기존 단골 고객: <strong>{analysisResult.customer_match.name}</strong> ({analysisResult.customer_match.phone})
                   </span>
@@ -541,9 +541,9 @@ export function NewOrderView({
                   <button
                     type="button"
                     onClick={handleApplyPastOrderAddress}
-                    className="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1"
+                    className="px-2 py-0.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-bold shrink-0 cursor-pointer flex items-center gap-1 whitespace-nowrap"
                   >
-                    <History className="w-3.5 h-3.5" />
+                    <History className="w-3 h-3" />
                     <span>과거 배송지 적용</span>
                   </button>
                 )}
@@ -556,42 +556,42 @@ export function NewOrderView({
       {/* ────────────────────────────────────────────────────────── */}
       {/* 2. 메인 주문 등록 입력 폼 (수기 입력 또는 자동 채움 검토) */}
       {/* ────────────────────────────────────────────────────────── */}
-      <div ref={formTopRef} className="bg-white rounded-2xl border-2 border-slate-300 p-6 md:p-8 shadow-sm">
-        <div className="border-b border-slate-200 pb-4 mb-6 flex justify-between items-center">
+      <div ref={formTopRef} className="bg-white rounded-2xl border-2 border-slate-300 p-3 md:p-4 shadow-sm">
+        <div className="border-b border-slate-200 pb-2 mb-3 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900">
+            <h1 className="text-xl md:text-2xl font-black text-slate-900">
               주문 등록
             </h1>
-            <p className="text-slate-600 text-sm mt-1">
+            <p className="text-slate-600 text-xs md:text-sm mt-0.5">
               고객 정보와 수량을 확인하시고 아래 [주문 등록 완료] 버튼을 눌러주세요.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           {/* 주문 구분: 일반 고객 택배 주문 vs 행사·축제 납품 */}
-          <div className="bg-slate-100 p-4 rounded-2xl border-2 border-slate-300 space-y-3">
+          <div className="bg-slate-100 p-2.5 rounded-xl border-2 border-slate-300 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-1">
-              <label className="text-base font-extrabold text-slate-900 flex items-center gap-1.5">
+              <label className="text-sm md:text-base font-extrabold text-slate-900 flex items-center gap-1.5">
                 <span>주문 구분</span>
                 <span className="text-xs font-bold text-slate-500">
                   (행사·축제 물량은 스케줄에서 별도로 분리 집계됩니다)
                 </span>
               </label>
               {isEvent && (
-                <span className="text-xs font-black text-purple-800 bg-purple-100 border border-purple-300 px-2.5 py-0.5 rounded-full whitespace-nowrap animate-pulse">
+                <span className="text-xs font-black text-purple-800 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-full whitespace-nowrap animate-pulse">
                   🎪 행사 납품 모드
                 </span>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setIsEvent(false)}
-                className={`py-3 px-3 rounded-xl font-black text-sm md:text-base flex items-center justify-center gap-2 cursor-pointer transition-all border-2 ${
+                className={`py-1.5 px-2.5 rounded-lg font-black text-sm md:text-base flex items-center justify-center gap-1.5 cursor-pointer transition-all border-2 whitespace-nowrap ${
                   !isEvent
-                    ? "bg-emerald-700 text-white border-emerald-800 shadow-md ring-2 ring-emerald-300"
+                    ? "bg-emerald-700 text-white border-emerald-800 shadow-xs ring-2 ring-emerald-300"
                     : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
                 }`}
               >
@@ -600,9 +600,9 @@ export function NewOrderView({
               <button
                 type="button"
                 onClick={() => setIsEvent(true)}
-                className={`py-3 px-3 rounded-xl font-black text-sm md:text-base flex items-center justify-center gap-2 cursor-pointer transition-all border-2 ${
+                className={`py-1.5 px-2.5 rounded-lg font-black text-sm md:text-base flex items-center justify-center gap-1.5 cursor-pointer transition-all border-2 whitespace-nowrap ${
                   isEvent
-                    ? "bg-purple-700 text-white border-purple-800 shadow-md ring-2 ring-purple-300"
+                    ? "bg-purple-700 text-white border-purple-800 shadow-xs ring-2 ring-purple-300"
                     : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
                 }`}
               >
@@ -611,15 +611,15 @@ export function NewOrderView({
             </div>
 
             {isEvent && (
-              <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-3.5 space-y-2 animate-in fade-in duration-150">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="text-sm font-black text-purple-950 flex items-center gap-1.5">
+              <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-2.5 space-y-1.5 animate-in fade-in duration-150">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <label className="text-xs md:text-sm font-black text-purple-950 flex items-center gap-1">
                     <span>행사 / 축제 이름 <span className="text-red-600">*</span></span>
                   </label>
                   <button
                     type="button"
                     onClick={() => setEventName("임실 김치 축제")}
-                    className="text-xs font-black bg-white hover:bg-purple-100 text-purple-800 border border-purple-300 px-2.5 py-1 rounded-md cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                    className="text-xs font-black bg-white hover:bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-md cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
                   >
                     + 임실 김치 축제 자동입력
                   </button>
@@ -629,7 +629,7 @@ export function NewOrderView({
                   value={eventName}
                   onChange={(e) => setEventName(e.target.value)}
                   placeholder="예: 임실 김치 축제"
-                  className="w-full text-base font-black border-2 border-purple-400 rounded-lg px-3 py-2 bg-white text-purple-950 focus:border-purple-600 focus:outline-hidden shadow-inner"
+                  className="w-full text-sm md:text-base font-black border-2 border-purple-400 rounded-lg px-2.5 py-1.5 bg-white text-purple-950 focus:border-purple-600 focus:outline-hidden shadow-inner"
                   required={isEvent}
                 />
                 <p className="text-xs text-purple-800 font-medium">
@@ -641,12 +641,12 @@ export function NewOrderView({
 
           {/* 고객명 & 연락처 & 주소 영역 (일반 택배 vs 행사 납품 분기) */}
           {isEvent ? (
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               {/* 행사 납품처 이름 입력 */}
               <div>
-                <label className="block text-lg font-black text-purple-950 mb-1.5 flex items-center justify-between">
+                <label className="block text-base font-black text-purple-950 mb-1 flex items-center justify-between">
                   <span>납품처 / 수령처 (행사 담당부서) <span className="text-red-600">*</span></span>
-                  <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md">
+                  <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md whitespace-nowrap">
                     행사 납품처 필수
                   </span>
                 </label>
@@ -655,30 +655,28 @@ export function NewOrderView({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="예: 축제 본부석, 김치 체험관, 1호 부스 등"
-                  className="w-full text-xl font-bold border-2 border-purple-400 rounded-xl px-4 py-3.5 focus:border-purple-600 focus:outline-hidden bg-white shadow-xs"
+                  className="w-full text-lg font-bold border-2 border-purple-400 rounded-xl px-3 py-2 focus:border-purple-600 focus:outline-hidden bg-white shadow-xs"
                   required
                 />
               </div>
-
-
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2.5">
               {/* 일반 고객명 & 연락처 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-lg font-bold text-slate-900">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-base font-bold text-slate-900">
                       전화번호 <span className="text-red-600">*</span>
                     </label>
                     <button
                       type="button"
                       onClick={handlePickContactForOrder}
-                      className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-300 cursor-pointer active:scale-95 transition-all"
+                      className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-100 hover:bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-lg border border-emerald-300 cursor-pointer active:scale-95 transition-all whitespace-nowrap shrink-0"
                       title="스마트폰 주소록에서 연락처 선택"
                     >
-                      <Smartphone className="w-4 h-4 text-emerald-700" />
-                      <span>핸드폰 연락처 선택</span>
+                      <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>연락처 선택</span>
                     </button>
                   </div>
                   <input
@@ -686,35 +684,35 @@ export function NewOrderView({
                     value={phone}
                     onChange={(e) => setPhone(formatPhone(e.target.value))}
                     placeholder="예: 010-1234-5678"
-                    className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
+                    className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-3 py-2 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
                     required
                   />
 
                   {/* 기존 고객 자동완성 드롭다운 */}
                   {customerSuggestions.length > 0 && (
-                    <div className="mt-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-3 space-y-2">
-                      <div className="text-sm font-bold text-emerald-900 flex items-center gap-1.5">
-                        <UserCheck className="w-4 h-4" />
+                    <div className="mt-1.5 bg-emerald-50 border-2 border-emerald-400 rounded-xl p-2 space-y-1">
+                      <div className="text-xs font-bold text-emerald-900 flex items-center gap-1">
+                        <UserCheck className="w-3.5 h-3.5" />
                         <span>기존 고객 터치 시 자동 입력:</span>
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {customerSuggestions.map((cust) => (
                           <button
                             key={cust.id}
                             type="button"
                             onClick={() => selectExistingCustomer(cust)}
-                            className="w-full text-left bg-white hover:bg-emerald-100 p-3 rounded-lg border border-emerald-200 cursor-pointer flex justify-between items-center transition-colors"
+                            className="w-full text-left bg-white hover:bg-emerald-100 p-2 rounded-lg border border-emerald-200 cursor-pointer flex justify-between items-center transition-colors"
                           >
                             <div>
-                              <span className="text-lg font-bold text-slate-900 mr-2">
+                              <span className="text-base font-bold text-slate-900 mr-2">
                                 {cust.name}
                               </span>
-                              <span className="text-sm text-slate-600">{cust.phone}</span>
-                              <div className="text-xs text-slate-500 truncate">
+                              <span className="text-xs text-slate-600">{cust.phone}</span>
+                              <div className="text-xs text-slate-500 truncate max-w-[200px]">
                                 {cust.address} {cust.address_detail}
                               </div>
                             </div>
-                            <span className="bg-emerald-700 text-white text-xs font-bold px-2.5 py-1 rounded-sm">
+                            <span className="bg-emerald-700 text-white text-xs font-bold px-2 py-0.5 rounded-sm whitespace-nowrap shrink-0">
                               선택
                             </span>
                           </button>
@@ -725,7 +723,7 @@ export function NewOrderView({
                 </div>
 
                 <div>
-                  <label className="block text-lg font-bold text-slate-900 mb-1.5">
+                  <label className="block text-base font-bold text-slate-900 mb-1">
                     고객 이름 (받는 분) <span className="text-red-600">*</span>
                   </label>
                   <input
@@ -733,7 +731,7 @@ export function NewOrderView({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="예: 홍길동"
-                    className="w-full text-xl font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 focus:border-emerald-600 focus:outline-hidden"
+                    className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
                     required
                   />
                 </div>
@@ -741,7 +739,7 @@ export function NewOrderView({
 
               {/* 배송지 주소 */}
               <div>
-                <label className="block text-lg font-bold text-slate-900 mb-1.5">
+                <label className="block text-base font-bold text-slate-900 mb-1">
                   배송 주소 <span className="text-red-600">*</span>
                 </label>
                 <input
@@ -749,7 +747,7 @@ export function NewOrderView({
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="시·군·구·도로명 또는 지번 주소"
-                  className="w-full text-lg font-bold border-2 border-slate-300 rounded-xl px-4 py-3.5 mb-2 focus:border-emerald-600 focus:outline-hidden"
+                  className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3 py-2 mb-1.5 focus:border-emerald-600 focus:outline-hidden"
                   required
                 />
                 <input
@@ -757,69 +755,69 @@ export function NewOrderView({
                   value={addressDetail}
                   onChange={(e) => setAddressDetail(e.target.value)}
                   placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
-                  className="w-full text-base border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-600 focus:outline-hidden"
+                  className="w-full text-sm border-2 border-slate-200 rounded-xl px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden"
                 />
               </div>
             </div>
           )}
 
           {/* 상품 단위 및 수량 선택 (절임배추 20kg 단일 규격) */}
-          <div className="border-t border-b border-slate-200 py-6 space-y-4">
+          <div className="border-t border-b border-slate-200 py-3 space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-black text-slate-900">
+              <h3 className="text-lg font-black text-slate-900">
                 주문 상품 및 수량
               </h3>
-              <span className="text-xs md:text-sm font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md whitespace-nowrap">
                 현재 판매 품목: 절임배추 20kg
               </span>
             </div>
 
             {/* 20kg 메인 카드 */}
-            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-2xl p-5 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="bg-emerald-50 border-2 border-emerald-400 rounded-xl p-2.5 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="text-2xl font-black text-emerald-950 flex items-center gap-2">
+                  <div className="text-xl font-black text-emerald-950 flex items-center gap-1.5">
                     <span>{product20.name}</span>
-                    <span className="text-sm font-bold bg-emerald-700 text-white px-2 py-0.5 rounded-md">
+                    <span className="text-xs font-bold bg-emerald-700 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
                       기본 1박스
                     </span>
                   </div>
-                  <div className="text-base font-bold text-emerald-800 mt-1">
+                  <div className="text-sm font-bold text-emerald-800 mt-0.5">
                     단가: <span className="stat-number">{formatPrice(product20.price)}</span>원 / 1박스
                   </div>
                 </div>
 
-                {/* 대형 수량 조절 버튼 */}
-                <div className="flex items-center gap-3">
+                {/* 수량 조절 버튼 */}
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setQty20kg((prev) => Math.max(1, prev - 1))}
-                    className="w-14 h-14 bg-white border-2 border-emerald-400 rounded-2xl text-2xl font-black flex items-center justify-center hover:bg-emerald-100 active:scale-95 cursor-pointer shadow-xs"
+                    className="w-10 h-10 bg-white border-2 border-emerald-400 rounded-xl text-xl font-black flex items-center justify-center hover:bg-emerald-100 active:scale-95 cursor-pointer shadow-xs shrink-0"
                   >
-                    <Minus className="w-7 h-7 text-emerald-900" />
+                    <Minus className="w-5 h-5 text-emerald-900" />
                   </button>
-                  <span className="text-4xl font-black w-14 text-center stat-number text-emerald-950">
+                  <span className="text-2xl font-black w-10 text-center stat-number text-emerald-950">
                     {qty20kg}
                   </span>
                   <button
                     type="button"
                     onClick={() => setQty20kg((prev) => prev + 1)}
-                    className="w-14 h-14 bg-emerald-700 text-white rounded-2xl text-2xl font-black flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer shadow-md"
+                    className="w-10 h-10 bg-emerald-700 text-white rounded-xl text-xl font-black flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer shadow-md shrink-0"
                   >
-                    <Plus className="w-7 h-7" />
+                    <Plus className="w-5 h-5" />
                   </button>
                 </div>
               </div>
 
               {/* 빠른 박스 수량 선택 버튼 모음 */}
-              <div className="pt-2 border-t border-emerald-200/80 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-emerald-900 mr-1">빠른 선택:</span>
+              <div className="pt-1.5 border-t border-emerald-200/80 flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-bold text-emerald-900 mr-0.5 whitespace-nowrap">빠른 선택:</span>
                 {[1, 2, 3, 5, 10].map((num) => (
                   <button
                     key={num}
                     type="button"
                     onClick={() => setQty20kg(num)}
-                    className={`px-3.5 py-1.5 rounded-xl font-extrabold text-sm border cursor-pointer transition-all ${
+                    className={`px-2.5 py-1 rounded-lg font-extrabold text-xs md:text-sm border cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                       qty20kg === num
                         ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
                         : "bg-white text-emerald-900 border-emerald-300 hover:bg-emerald-100"
@@ -833,38 +831,38 @@ export function NewOrderView({
           </div>
 
           {/* 택배 도착 희망일 (배추 받는 날) 선택 */}
-          <div className="bg-emerald-50/60 border-2 border-emerald-400 rounded-2xl p-5 space-y-3">
+          <div className="bg-emerald-50/60 border-2 border-emerald-400 rounded-xl p-2.5 space-y-1.5">
             <div>
-              <label className="text-xl font-black text-slate-900 flex items-center gap-1.5">
+              <label className="text-base md:text-lg font-black text-slate-900 flex items-center gap-1">
                 <span>택배 도착 희망일 (배추 받는 날)</span>
                 <span className="text-red-600">*</span>
               </label>
             </div>
-            <p className="text-sm font-semibold text-slate-600">
+            <p className="text-xs font-semibold text-slate-600">
               고객이 김치 담그기 전날 수령할 날짜를 선택합니다.
             </p>
             <input
               type="date"
               value={shippingDate}
               onChange={(e) => setShippingDate(e.target.value)}
-              className="w-full text-2xl font-black border-2 border-emerald-500 rounded-xl px-4 py-3.5 focus:border-emerald-700 focus:outline-hidden bg-white"
+              className="w-full text-xl font-black border-2 border-emerald-500 rounded-lg px-3 py-2 focus:border-emerald-700 focus:outline-hidden bg-white"
               required
             />
           </div>
 
           {/* 입금 상태 선택 */}
           <div>
-            <label className="block text-lg font-bold text-slate-900 mb-1.5">
+            <label className="block text-base font-bold text-slate-900 mb-1">
               입금 여부
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setPaymentStatus("UNPAID")}
-                className={`py-3.5 rounded-xl border-2 cursor-pointer transition-all text-lg ${
+                className={`py-2 rounded-xl border-2 cursor-pointer transition-all text-base font-bold whitespace-nowrap ${
                   paymentStatus === "UNPAID"
                     ? "bg-red-50 border-red-500 text-red-900 font-black shadow-xs"
-                    : "bg-white border-slate-300 text-slate-700 font-bold"
+                    : "bg-white border-slate-300 text-slate-700"
                 }`}
               >
                 미입금 (입금 대기)
@@ -872,10 +870,10 @@ export function NewOrderView({
               <button
                 type="button"
                 onClick={() => setPaymentStatus("PAID")}
-                className={`py-3.5 rounded-xl border-2 cursor-pointer transition-all text-lg ${
+                className={`py-2 rounded-xl border-2 cursor-pointer transition-all text-base font-bold whitespace-nowrap ${
                   paymentStatus === "PAID"
                     ? "bg-blue-50 border-blue-600 text-blue-900 font-black shadow-xs"
-                    : "bg-white border-slate-300 text-slate-700 font-bold"
+                    : "bg-white border-slate-300 text-slate-700"
                 }`}
               >
                 입금 완료 (확인됨)
@@ -885,7 +883,7 @@ export function NewOrderView({
 
           {/* 배송 및 원본 메모 */}
           <div>
-            <label className="block text-base font-bold text-slate-800 mb-1.5">
+            <label className="block text-sm md:text-base font-bold text-slate-800 mb-1">
               배송 메모 및 원본 내용 (선택)
             </label>
             <textarea
@@ -893,19 +891,19 @@ export function NewOrderView({
               value={memo}
               onChange={(e) => setMemo(e.target.value)}
               placeholder="예: 문 앞에 놓아주세요 / 오후 배송 요망"
-              className="w-full text-base border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-emerald-600 focus:outline-hidden"
+              className="w-full text-sm md:text-base border-2 border-slate-200 rounded-xl px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden"
             />
           </div>
 
           {/* 총 금액 요약 */}
-          <div className="bg-slate-900 text-white rounded-2xl p-6">
-            <div className="flex justify-between items-center text-xl font-bold mb-2">
+          <div className="bg-slate-900 text-white rounded-xl p-3">
+            <div className="flex justify-between items-center text-lg font-bold mb-1">
               <span>총 주문 금액:</span>
-              <span className="text-3xl md:text-4xl font-black text-amber-400 stat-number">
+              <span className="text-2xl md:text-3xl font-black text-amber-400 stat-number">
                 {formatPrice(totalAmount)}원
               </span>
             </div>
-            <div className="text-xs md:text-sm text-slate-300 border-t border-slate-800 pt-3 mt-3">
+            <div className="text-xs text-slate-300 border-t border-slate-800 pt-1.5 mt-1.5">
               입금 안내 계좌: {settings.bank_name || "농협"} {settings.bank_account || "351-0000-0000-00"} ({settings.owner_name || "대표자"})
             </div>
           </div>
@@ -914,9 +912,9 @@ export function NewOrderView({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-4.5 bg-emerald-700 hover:bg-emerald-800 text-white text-2xl font-black rounded-xl shadow-md cursor-pointer transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-lg font-black rounded-xl shadow-md cursor-pointer transition-colors flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
           >
-            <CheckCircle2 className="w-7 h-7" />
+            <CheckCircle2 className="w-5 h-5 shrink-0" />
             <span>{isSubmitting ? "주문 등록 중..." : "확인 완료 및 주문 등록"}</span>
           </button>
         </form>
@@ -924,31 +922,31 @@ export function NewOrderView({
 
       {/* 1. 주문 등록 완료 후 문자/카톡 발송 확인 팝업 */}
       {showPostOrderPrompt && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-5 shadow-2xl border-4 border-emerald-600 animate-in zoom-in-95 duration-150">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-10 h-10" />
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 text-center space-y-3 shadow-2xl border-4 border-emerald-600 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
 
             <div>
-              <h3 className="text-2xl font-black text-slate-900">
+              <h3 className="text-xl font-black text-slate-900">
                 주문 등록이 완료되었습니다!
               </h3>
-              <p className="text-base text-slate-600 mt-2 font-semibold leading-relaxed">
+              <p className="text-sm text-slate-600 mt-1 font-semibold leading-relaxed">
                 고객님(<strong>{createdOrderShareData?.customerName}</strong>)에게 주문 확인서와 입금 계좌를 <strong>문자나 카카오톡으로 발송</strong>하시겠습니까?
               </p>
             </div>
 
-            <div className="space-y-2 pt-2">
+            <div className="space-y-1.5 pt-1">
               <button
                 type="button"
                 onClick={() => {
                   setShowPostOrderPrompt(false);
                   setShowShareModal(true);
                 }}
-                className="w-full py-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-lg font-black flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-98 transition-all"
+                className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-base font-black flex items-center justify-center gap-1.5 cursor-pointer shadow-md active:scale-98 transition-all whitespace-nowrap"
               >
-                <Share2 className="w-5 h-5" />
+                <Share2 className="w-4 h-4" />
                 <span>예, 문자·카톡 발송하기</span>
               </button>
 
@@ -958,7 +956,7 @@ export function NewOrderView({
                   setShowPostOrderPrompt(false);
                   onOrderSaved();
                 }}
-                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-base font-bold cursor-pointer transition-colors"
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold cursor-pointer transition-colors whitespace-nowrap"
               >
                 나중에 보내기 (완료)
               </button>
