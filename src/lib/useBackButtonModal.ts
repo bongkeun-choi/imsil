@@ -14,6 +14,8 @@ export function useBackButtonModal(
   modalId: string
 ) {
   const isBackTriggeredRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -25,10 +27,10 @@ export function useBackButtonModal(
       window.history.pushState({ isModal: true, modalId }, "");
     }
 
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = () => {
       // 뒤로가기 버튼을 눌렀을 때
       isBackTriggeredRef.current = true;
-      onClose();
+      onCloseRef.current();
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -47,5 +49,5 @@ export function useBackButtonModal(
         window.history.back();
       }
     };
-  }, [isOpen, onClose, modalId]);
+  }, [isOpen, modalId]);
 }

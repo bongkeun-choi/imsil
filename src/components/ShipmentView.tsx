@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { formatPrice } from "@/lib/utils";
 import { Download, CheckSquare, Square, Phone, RefreshCw, Edit3, Share2, Printer } from "lucide-react";
 import { format } from "date-fns";
@@ -115,6 +115,10 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
     }
   };
 
+  const handleCloseOrderEdit = useCallback(() => {
+    setEditingOrder(null);
+  }, []);
+
   const handleOrderUpdated = (shareData?: OrderCardData) => {
     setEditingOrder(null);
     fetchOrders(selectedDate);
@@ -148,10 +152,14 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
     fetchOrders(selectedDate);
   }, [selectedDate]);
 
-  // 포장완료 원클릭 토글
-  const handleTogglePacked = async (orderId: number) => {
+  // 포장완료 원클릭 토글 (완료 <-> 대기 상호 전환)
+  const handleTogglePacked = async (orderId: number, currentPacked: boolean) => {
     try {
-      await updateOrderActionService(orderId, "mark_packed");
+      if (currentPacked) {
+        await updateOrderActionService(orderId, "unmark_packed");
+      } else {
+        await updateOrderActionService(orderId, "mark_packed");
+      }
       fetchOrders(selectedDate);
     } catch (e) {
       alert("상태 변경 오류");
@@ -463,7 +471,7 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
 
                     <div className="flex flex-col items-end gap-2 shrink-0">
                       <button
-                        onClick={() => handleTogglePacked(ord.id)}
+                        onClick={() => handleTogglePacked(ord.id, isPacked)}
                         className={`py-1.5 px-3 rounded-xl border-2 cursor-pointer flex items-center gap-1.5 font-bold text-sm md:text-base transition-all whitespace-nowrap ${
                           isPacked
                             ? "bg-emerald-700 text-white border-emerald-800"
@@ -553,7 +561,7 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
         <OrderEditModal
           order={editingOrder}
           isOpen={!!editingOrder}
-          onClose={() => setEditingOrder(null)}
+          onClose={handleCloseOrderEdit}
           onOrderUpdated={handleOrderUpdated}
           onOrderDeleted={handleOrderDeleted}
           settings={settings}

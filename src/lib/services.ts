@@ -383,7 +383,7 @@ export async function fetchOrdersService(dateStr: string) {
 
 export async function updateOrderActionService(
   orderId: number,
-  action: "mark_paid" | "mark_packed" | "mark_shipped" | "update_tracking",
+  action: "mark_paid" | "mark_packed" | "unmark_packed" | "mark_shipped" | "update_tracking",
   payload?: { tracking_no?: string; courier?: string }
 ) {
   const db = getClientDb();
@@ -420,6 +420,18 @@ export async function updateOrderActionService(
     });
     await db.execute({
       sql: "UPDATE shipments SET status = 'PACKED', updated_at = ? WHERE order_id = ?",
+      args: [now, orderId],
+    });
+    return true;
+  }
+
+  if (action === "unmark_packed") {
+    await db.execute({
+      sql: "UPDATE orders SET order_status = 'RECEIVED', updated_at = ? WHERE id = ?",
+      args: [now, orderId],
+    });
+    await db.execute({
+      sql: "UPDATE shipments SET status = 'READY', updated_at = ? WHERE order_id = ?",
       args: [now, orderId],
     });
     return true;

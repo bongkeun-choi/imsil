@@ -95,29 +95,7 @@ export function OrderEditModal({
     setSavedShareData(null);
   }, [isOpen, order]);
 
-  // 스마트폰 뒤로가기 버튼 안전 연동
-  useEffect(() => {
-    if (!isOpen) return;
 
-    let closedByPop = false;
-    const currentState = window.history.state;
-    if (currentState?.modal !== "order-edit") {
-      window.history.pushState({ ...currentState, modal: "order-edit" }, "");
-    }
-
-    const handlePopState = () => {
-      closedByPop = true;
-      onClose();
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-      if (!closedByPop && window.history.state?.modal === "order-edit") {
-        window.history.back();
-      }
-    };
-  }, [isOpen]);
 
   if (!isOpen || !order) return null;
 
