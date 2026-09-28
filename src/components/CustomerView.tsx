@@ -92,7 +92,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
   // 배송지(수령인) 추가/수정 모달 상태
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
-  const [addressAlias, setAddressAlias] = useState("서울 딸네");
+  const [addressAlias, setAddressAlias] = useState("");
+  const [isAliasManuallyEdited, setIsAliasManuallyEdited] = useState(false);
   const [addressRecipientName, setAddressRecipientName] = useState("");
   const [addressRecipientPhone, setAddressRecipientPhone] = useState("");
   const [addressRecipientPhone2, setAddressRecipientPhone2] = useState("");
@@ -395,7 +396,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
   // 신규 배송지 등록 모달 열기
   const handleOpenAddAddress = () => {
     setEditingAddressId(null);
-    setAddressAlias("서울 딸네");
+    setAddressAlias("");
+    setIsAliasManuallyEdited(false);
     setAddressRecipientName("");
     setAddressRecipientPhone("");
     setAddressRecipientPhone2("");
@@ -408,7 +410,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
   // 배송지 수정 모달 열기
   const handleOpenEditAddress = (addr: CustomerAddress) => {
     setEditingAddressId(addr.id);
-    setAddressAlias(addr.alias || "배송지");
+    setAddressAlias(addr.alias || "");
+    setIsAliasManuallyEdited(true);
     setAddressRecipientName(addr.recipient_name || "");
     setAddressRecipientPhone(addr.recipient_phone || "");
     setAddressRecipientPhone2(addr.recipient_phone2 || "");
@@ -427,6 +430,9 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
       return;
     }
 
+    const recipientNameTrimmed = addressRecipientName.trim();
+    const finalAlias = addressAlias.trim() || recipientNameTrimmed || "배송지";
+
     setIsAddingAddress(true);
     try {
       if (editingAddressId) {
@@ -434,8 +440,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
         await updateCustomerAddressService({
           id: editingAddressId,
           customer_id: selectedCustomerId,
-          alias: addressAlias.trim() || "배송지",
-          recipient_name: addressRecipientName.trim(),
+          alias: finalAlias,
+          recipient_name: recipientNameTrimmed,
           recipient_phone: addressRecipientPhone.trim() ? formatKoreanPhone(addressRecipientPhone.trim()) : "",
           recipient_phone2: addressRecipientPhone2.trim() ? formatKoreanPhone(addressRecipientPhone2.trim()) : "",
           address: addressLine.trim(),
@@ -447,8 +453,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
         // 신규 추가
         await addCustomerAddressService({
           customer_id: selectedCustomerId,
-          alias: addressAlias.trim() || "배송지",
-          recipient_name: addressRecipientName.trim(),
+          alias: finalAlias,
+          recipient_name: recipientNameTrimmed,
           recipient_phone: addressRecipientPhone.trim() ? formatKoreanPhone(addressRecipientPhone.trim()) : (customerDetail?.customer?.phone || ""),
           recipient_phone2: addressRecipientPhone2.trim() ? formatKoreanPhone(addressRecipientPhone2.trim()) : undefined,
           address: addressLine.trim(),
@@ -1264,31 +1270,17 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
             <form onSubmit={handleSaveNewAddress} className="p-4 space-y-3 overflow-y-auto flex-1 text-sm">
               <div>
                 <label className="block text-xs font-bold text-slate-800 mb-1">
-                  배송지 별칭 (관계) <span className="text-red-600">*</span>
+                  배송지 별칭 <span className="text-slate-500 font-normal text-[11px]">(선택 - 작성 시 받는 분 성함으로 자동 설정)</span>
                 </label>
-                <div className="flex gap-1.5 mb-1.5 flex-wrap">
-                  {["서울 딸네", "부산 아들네", "시댁", "친정", "자택"].map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => setAddressAlias(tag)}
-                      className={`text-xs px-2 py-1 rounded border font-bold cursor-pointer ${
-                        addressAlias === tag
-                          ? "bg-slate-900 text-white border-slate-900"
-                          : "bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200"
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
                 <input
                   type="text"
                   value={addressAlias}
-                  onChange={(e) => setAddressAlias(e.target.value)}
-                  placeholder="예: 서울 딸네, 시댁, 친정 등"
+                  onChange={(e) => {
+                    setAddressAlias(e.target.value);
+                    setIsAliasManuallyEdited(true);
+                  }}
+                  placeholder="비워두면 받는 분 성함으로 자동 지정됩니다 (직접 입력 가능)"
                   className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
-                  required
                 />
               </div>
 
@@ -1299,8 +1291,14 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                 <input
                   type="text"
                   value={addressRecipientName}
-                  onChange={(e) => setAddressRecipientName(e.target.value)}
-                  placeholder="수령인 성함 (예: 김딸, 박아들)"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setAddressRecipientName(val);
+                    if (!isAliasManuallyEdited || !addressAlias.trim()) {
+                      setAddressAlias(val);
+                    }
+                  }}
+                  placeholder="수령인 성함 (예: 홍길동)"
                   className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
                   required
                 />

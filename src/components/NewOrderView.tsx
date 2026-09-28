@@ -124,7 +124,7 @@ export function NewOrderView({
     setDestinations((prev) => [
       ...prev,
       {
-        alias: `배송지 ${prev.length + 1}`,
+        alias: "",
         recipient_name: "",
         recipient_phone: "",
         recipient_phone2: "",
@@ -1121,7 +1121,7 @@ export function NewOrderView({
                       if (destinations.length === 1 && !destinations[0].address) {
                         setDestinations([
                           {
-                            alias: "서울 딸네",
+                            alias: "",
                             recipient_name: recipientName || "",
                             recipient_phone: recipientPhone || "",
                             recipient_phone2: "",
@@ -1182,7 +1182,7 @@ export function NewOrderView({
                             type="text"
                             value={dest.alias || ""}
                             onChange={(e) => handleUpdateDestination(idx, "alias", e.target.value)}
-                            placeholder="별칭 (예: 서울 딸네, 부산 아들네, 시댁)"
+                            placeholder="별칭 (비워두면 받는 분 성함으로 자동 설정)"
                             className="text-xs font-bold border border-slate-300 rounded px-2 py-0.5 bg-white text-slate-800 focus:border-emerald-600 focus:outline-hidden"
                           />
                         </div>
@@ -1491,7 +1491,7 @@ export function NewOrderView({
                           type="text"
                           value={newAddressLabel}
                           onChange={(e) => setNewAddressLabel(e.target.value)}
-                          placeholder="배송지 명칭 입력 (예: 서울 딸네, 부산 아들네, 회사)"
+                          placeholder="배송지 별칭 (비워두면 받는 분 성함으로 자동 설정)"
                           className="w-full text-xs border border-emerald-300 rounded-lg px-2.5 py-1.5 bg-emerald-50 text-emerald-950 focus:border-emerald-600 focus:outline-hidden"
                         />
                       </div>
