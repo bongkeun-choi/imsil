@@ -242,6 +242,7 @@ export async function initClientTables(client: Client): Promise<void> {
       { key: "bank_account", value: "351-0000-0000-00" },
       { key: "owner_name", value: "대표자" },
       { key: "default_courier", value: "우체국택배" },
+      { key: "default_product_id", value: "2" },
     ];
 
     for (const s of defaultSettings) {

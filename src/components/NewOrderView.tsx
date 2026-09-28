@@ -182,9 +182,12 @@ export function NewOrderView({
     "new-order-prompt"
   );
 
-  // 2. 상품 및 수량 상태 (현재 판매 상품: 절임배추 20kg 단일 규격)
+  // 2. 상품 및 수량 상태 (기본 선택 상품 및 수량)
   const [products, setProducts] = useState<any[]>([]);
-  const [qty20kg, setQty20kg] = useState(1); // 기본 20kg 1박스
+  const [qty20kg, setQty20kg] = useState(1); // 기본 수량 1개
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(() => {
+    return settings?.default_product_id ? Number(settings.default_product_id) : null;
+  });
 
   // 3. 기존 고객 자동 검색 결과 (직접 번호 타이핑 시)
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
@@ -214,6 +217,9 @@ export function NewOrderView({
       .then((data) => {
         if (data.products) {
           setProducts(data.products);
+          if (data.settings?.default_product_id) {
+            setSelectedProductId((prev) => prev ?? Number(data.settings.default_product_id));
+          }
         }
       })
       .catch((e) => {
@@ -462,19 +468,30 @@ export function NewOrderView({
     }
   };
 
-  // 단가 및 총액 계산 (단일 배송 vs 다중 배송)
-  const product20 = products.find((p) => Number(p.weight_kg) === 20) || {
-    id: 2,
-    name: "절임배추 20kg",
-    price: 68000,
-    weight_kg: 20,
-  };
+  // 활성 상품 목록
+  const activeProducts = products.filter((p) => p.active !== 0);
+
+  // 현재 선택된 상품 (우선순위: 선택 ID -> 기본설정 ID -> 20kg 상품 -> 첫번째 상품 -> 기본 폴백)
+  const selectedProduct =
+    (selectedProductId ? products.find((p) => p.id === selectedProductId) : null) ||
+    (settings?.default_product_id ? products.find((p) => String(p.id) === String(settings.default_product_id)) : null) ||
+    products.find((p) => Number(p.weight_kg) === 20) ||
+    activeProducts[0] ||
+    products[0] || {
+      id: 2,
+      name: "절임배추 20kg",
+      price: 68000,
+      weight_kg: 20,
+      unit: "박스",
+    };
+
+  const product20 = selectedProduct;
 
   const totalBoxes = isMultiDest
     ? destinations.reduce((sum, d) => sum + Number(d.quantity || 0), 0)
     : qty20kg;
 
-  const totalAmount = totalBoxes * Number(product20.price);
+  const totalAmount = totalBoxes * Number(selectedProduct.price);
 
   // --- 최종 주문 등록 제출 ---
   const handleSubmit = async (e: React.FormEvent) => {
@@ -506,7 +523,7 @@ export function NewOrderView({
           return;
         }
         if (d.quantity < 1) {
-          alert(`[배송지 ${i + 1}] 수량을 1박스 이상 입력해 주세요.`);
+          alert(`[배송지 ${i + 1}] 수량을 1개 이상 입력해 주세요.`);
           return;
         }
       }
@@ -519,17 +536,17 @@ export function NewOrderView({
           customer_phone: phone.trim(),
           payment_status: paymentStatus,
           product: {
-            id: product20.id,
-            name: product20.name,
-            price: product20.price,
-            weight_kg: product20.weight_kg,
+            id: selectedProduct.id,
+            name: selectedProduct.name,
+            price: Number(selectedProduct.price),
+            weight_kg: Number(selectedProduct.weight_kg || 0),
           },
           destinations,
           order_type: isEvent ? "EVENT" : "NORMAL",
           event_name: isEvent ? (eventName.trim() || "임실 김치 축제") : null,
         });
 
-        alert(`총 ${multiRes.totalCount}곳의 배송지로 주문이 일괄 등록되었습니다! (총 ${multiRes.totalBoxes}박스)`);
+        alert(`총 ${multiRes.totalCount}곳의 배송지로 주문이 일괄 등록되었습니다! (총 ${multiRes.totalBoxes}${selectedProduct.unit || "박스"})`);
 
         const firstOrder = multiRes.orders[0];
         const shareData: OrderCardData = {
@@ -539,10 +556,10 @@ export function NewOrderView({
           shippingDate: destinations[0]?.shipping_date || shippingDate,
           shippingAddress: `${destinations[0]?.recipient_name} 등 총 ${multiRes.totalCount}곳 배송`,
           shippingAddressDetail: "",
-          itemsSummary: `절임배추 20kg 총 ${multiRes.totalBoxes}박스 (${multiRes.totalCount}곳 배송)`,
+          itemsSummary: `${selectedProduct.name} 총 ${multiRes.totalBoxes}${selectedProduct.unit || "박스"} (${multiRes.totalCount}곳 배송)`,
           totalAmount: multiRes.totalAmount,
           paymentStatus,
-          memo: `[다중 배송] ${destinations.map(d => `${d.recipient_name}(${d.quantity}박스)`).join(", ")}`,
+          memo: `[다중 배송] ${destinations.map(d => `${d.recipient_name}(${d.quantity}${selectedProduct.unit || "박스"})`).join(", ")}`,
           shopName: settings.shop_name || "임실참배추농원",
           shopPhone: settings.shop_phone || (settings as any).phone || "010-0000-0000",
           extraPhones: parseExtraPhones(settings.extra_phones),
@@ -568,17 +585,17 @@ export function NewOrderView({
       return;
     }
     if (qty20kg < 1) {
-      alert("절임배추 20kg 수량을 1박스 이상 선택해 주세요.");
+      alert(`${selectedProduct.name} 수량을 1개 이상 선택해 주세요.`);
       return;
     }
 
     const items = [
       {
-        product_id: product20.id,
-        product_name: product20.name,
+        product_id: selectedProduct.id,
+        product_name: selectedProduct.name,
         quantity: qty20kg,
-        unit_price: product20.price,
-        weight_kg: 20,
+        unit_price: Number(selectedProduct.price),
+        weight_kg: Number(selectedProduct.weight_kg || 0),
       },
     ];
 
@@ -1280,11 +1297,11 @@ export function NewOrderView({
                         />
                       </div>
 
-                      {/* 이 배송지로 보낼 수량(박스) & 도착 희망일 & 요청사항 */}
+                      {/* 이 배송지로 보낼 수량 & 도착 희망일 & 요청사항 */}
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200">
                         <div>
                           <label className="block text-xs font-bold text-slate-800 mb-1">
-                            발송 수량 (20kg 박스) <span className="text-red-600">*</span>
+                            발송 수량 ({selectedProduct.unit || "박스"}) <span className="text-red-600">*</span>
                           </label>
                           <div className="flex items-center gap-1.5">
                             <button
@@ -1295,7 +1312,7 @@ export function NewOrderView({
                               -
                             </button>
                             <span className="w-10 text-center font-black text-sm text-slate-900">
-                              {dest.quantity}박스
+                              {dest.quantity}{selectedProduct.unit || "박스"}
                             </span>
                             <button
                               type="button"
@@ -1305,7 +1322,7 @@ export function NewOrderView({
                               +
                             </button>
                             <span className="text-xs text-emerald-800 font-bold ml-1">
-                              {formatPrice(dest.quantity * Number(product20.price))}원
+                              {formatPrice(dest.quantity * Number(selectedProduct.price))}원
                             </span>
                           </div>
                         </div>
@@ -1523,48 +1540,142 @@ export function NewOrderView({
 
           {/* 상품 단위 및 수량 선택 (단일 배송 시 개별 수량/배송일, 다중 배송 시 합계 안내) */}
           {isMultiDest ? (
-            <div className="bg-slate-900 text-white rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
-              <div>
-                <div className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  <span>다중 배송 총합 ({destinations.length}곳 분할 발송)</span>
+            <div className="space-y-3">
+              {/* 다중 배송 상품 선택 영역 */}
+              <div className="border-t border-b border-slate-200 py-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-slate-900">
+                    주문 상품 선택
+                  </h3>
+                  <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap">
+                    선택: {selectedProduct.name}
+                  </span>
                 </div>
-                <div className="text-sm font-bold text-emerald-400 mt-0.5">
-                  절임배추 20kg 총 {totalBoxes}박스 ({totalBoxes * 20}kg)
+
+                {/* 상품 선택 버튼 목록 */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+                  {(activeProducts.length > 0 ? activeProducts : products).map((prod) => {
+                    const isSelected = prod.id === selectedProduct.id;
+                    const isDefault = String(prod.id) === String(settings.default_product_id);
+                    return (
+                      <button
+                        key={prod.id}
+                        type="button"
+                        onClick={() => setSelectedProductId(prod.id)}
+                        className={`px-3 py-2 rounded-xl border text-left cursor-pointer transition-all shrink-0 whitespace-nowrap ${
+                          isSelected
+                            ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
+                            : "bg-white text-slate-800 border-slate-300 hover:border-emerald-500 hover:bg-emerald-50/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-sm font-bold">{prod.name}</span>
+                          {isDefault && (
+                            <span
+                              className={`text-xs px-1 py-0.2 rounded font-semibold ${
+                                isSelected
+                                  ? "bg-emerald-900 text-emerald-100 border border-emerald-700"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}
+                            >
+                              [기본]
+                            </span>
+                          )}
+                        </div>
+                        <div className={`text-xs ${isSelected ? "text-emerald-100" : "text-slate-500"}`}>
+                          {formatPrice(prod.price)}원 / 1{prod.unit || "박스"} {prod.weight_kg ? `(${prod.weight_kg}kg)` : ""}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-xs text-slate-300">총 합계 금액</div>
-                <div className="text-base font-black text-white">
-                  {formatPrice(totalAmount)}원
+
+              {/* 다중 배송 총합 요약 카드 */}
+              <div className="bg-slate-900 text-white rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                <div>
+                  <div className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>다중 배송 총합 ({destinations.length}곳 분할 발송)</span>
+                  </div>
+                  <div className="text-sm font-bold text-emerald-400 mt-0.5">
+                    {selectedProduct.name} 총 {totalBoxes}{selectedProduct.unit || "박스"} {selectedProduct.weight_kg ? `(${totalBoxes * Number(selectedProduct.weight_kg)}kg)` : ""}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-slate-300">총 합계 금액</div>
+                  <div className="text-base font-black text-white">
+                    {formatPrice(totalAmount)}원
+                  </div>
                 </div>
               </div>
             </div>
           ) : (
             <>
-              {/* 상품 단위 및 수량 선택 (절임배추 20kg 단일 규격) */}
+              {/* 상품 단위 및 수량 선택 (단일 배송 모드) */}
               <div className="border-t border-b border-slate-200 py-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-slate-900">
                     주문 상품 및 수량
                   </h3>
-                  <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md whitespace-nowrap">
-                    판매 품목: 절임배추 20kg
+                  <span className="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap">
+                    선택: {selectedProduct.name}
                   </span>
                 </div>
 
-                {/* 20kg 메인 카드 */}
+                {/* 상품 선택 버튼 목록 */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5">
+                  {(activeProducts.length > 0 ? activeProducts : products).map((prod) => {
+                    const isSelected = prod.id === selectedProduct.id;
+                    const isDefault = String(prod.id) === String(settings.default_product_id);
+                    return (
+                      <button
+                        key={prod.id}
+                        type="button"
+                        onClick={() => setSelectedProductId(prod.id)}
+                        className={`px-3 py-2 rounded-xl border text-left cursor-pointer transition-all shrink-0 whitespace-nowrap ${
+                          isSelected
+                            ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
+                            : "bg-white text-slate-800 border-slate-300 hover:border-emerald-500 hover:bg-emerald-50/50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-sm font-bold">{prod.name}</span>
+                          {isDefault && (
+                            <span
+                              className={`text-xs px-1 py-0.2 rounded font-semibold ${
+                                isSelected
+                                  ? "bg-emerald-900 text-emerald-100 border border-emerald-700"
+                                  : "bg-emerald-100 text-emerald-800"
+                              }`}
+                            >
+                              [기본]
+                            </span>
+                          )}
+                        </div>
+                        <div className={`text-xs ${isSelected ? "text-emerald-100" : "text-slate-500"}`}>
+                          {formatPrice(prod.price)}원 / 1{prod.unit || "박스"} {prod.weight_kg ? `(${prod.weight_kg}kg)` : ""}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* 선택된 상품 수량 조절 카드 */}
                 <div className="bg-emerald-50/70 border border-emerald-300 rounded-xl p-3 space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <div className="text-base font-bold text-emerald-950 flex items-center gap-1.5">
-                        <span>{product20.name}</span>
-                        <span className="text-xs font-semibold bg-emerald-700 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
-                          기본 1박스
-                        </span>
+                        <span>{selectedProduct.name}</span>
+                        {String(selectedProduct.id) === String(settings.default_product_id) && (
+                          <span className="text-xs font-semibold bg-emerald-700 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
+                            기본 상품
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm font-bold text-emerald-800 mt-0.5">
-                        단가: <span className="stat-number">{formatPrice(product20.price)}</span>원 / 1박스
+                        단가: <span className="stat-number">{formatPrice(selectedProduct.price)}</span>원 / 1{selectedProduct.unit || "박스"}
+                        {selectedProduct.weight_kg ? ` (${selectedProduct.weight_kg}kg)` : ""}
                       </div>
                     </div>
 
@@ -1577,8 +1688,8 @@ export function NewOrderView({
                       >
                         <Minus className="w-4 h-4 text-emerald-900" />
                       </button>
-                      <span className="text-xl font-bold w-10 text-center stat-number text-emerald-950">
-                        {qty20kg}
+                      <span className="text-xl font-bold w-12 text-center stat-number text-emerald-950">
+                        {qty20kg}{selectedProduct.unit || "박스"}
                       </span>
                       <button
                         type="button"
@@ -1590,7 +1701,7 @@ export function NewOrderView({
                     </div>
                   </div>
 
-                  {/* 빠른 박스 수량 선택 버튼 모음 */}
+                  {/* 빠른 수량 선택 버튼 모음 */}
                   <div className="pt-2 border-t border-emerald-200 flex flex-wrap items-center gap-1.5">
                     <span className="text-xs font-bold text-emerald-900 mr-0.5 whitespace-nowrap">빠른 선택:</span>
                     {[1, 2, 3, 5, 10].map((num) => (
@@ -1604,7 +1715,7 @@ export function NewOrderView({
                             : "bg-white text-emerald-900 border-emerald-300 hover:bg-emerald-100"
                         }`}
                       >
-                        {num}박스 ({num * 20}kg)
+                        {num}{selectedProduct.unit || "박스"} {selectedProduct.weight_kg ? `(${num * Number(selectedProduct.weight_kg)}kg)` : ""}
                       </button>
                     ))}
                   </div>

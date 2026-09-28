@@ -54,6 +54,7 @@ export function SettingsView({
   const [price20kg, setPrice20kg] = useState(68000);
   const [product10Id, setProduct10Id] = useState<number | null>(null);
   const [product20Id, setProduct20Id] = useState<number | null>(null);
+  const [defaultProductId, setDefaultProductId] = useState<number | null>(null);
 
   // 전체 품목 목록 및 모달 상태
   const [productsList, setProductsList] = useState<ProductItem[]>([]);
@@ -93,6 +94,9 @@ export function SettingsView({
           setBankAccount(data.settings.bank_account || "351-0000-0000-00");
           setOwnerName(data.settings.owner_name || "백양임");
           setDefaultCourier(data.settings.default_courier || "우체국택배");
+          if (data.settings.default_product_id) {
+            setDefaultProductId(Number(data.settings.default_product_id));
+          }
           
           if (data.settings.extra_phones) {
             setExtraPhones(parseExtraPhones(data.settings.extra_phones));
@@ -113,6 +117,10 @@ export function SettingsView({
             if (Number(p.weight_kg) === 20) {
               setPrice20kg(Number(p.price));
               setProduct20Id(Number(p.id));
+              // 기본 상품이 아직 설정되지 않았으면 20kg 상품을 기본으로 지정
+              if (!data.settings?.default_product_id) {
+                setDefaultProductId(Number(p.id));
+              }
             }
           }
         }
@@ -287,14 +295,12 @@ export function SettingsView({
           bank_account: bankAccount.trim(),
           owner_name: ownerName.trim(),
           default_courier: defaultCourier.trim(),
+          default_product_id: defaultProductId ? String(defaultProductId) : "",
         },
-        [
-          { id: product10Id!, price: price10kg },
-          { id: product20Id!, price: price20kg },
-        ].filter((p) => p.id !== null)
+        productsList.map((p) => ({ id: p.id, price: Number(p.price) || 0 }))
       );
 
-      alert("농가 정보, 대표 연락처 및 카톡·문자 발송 문구가 성공적으로 저장되었습니다.");
+      alert("농가 정보, 대표 품목 설정 및 발송 문구가 성공적으로 저장되었습니다.");
       onSettingsUpdated();
     } catch (e: any) {
       alert("저장 실패: " + e.message);
@@ -675,36 +681,44 @@ export function SettingsView({
               </button>
             </div>
 
-            {/* 대표 절임배추 20kg 바로가기 단가 설정 (기존 사용성 100% 보존) */}
-            <div className="bg-emerald-50/90 p-4 md:p-5 rounded-2xl border-2 border-emerald-400 space-y-2">
+            {/* 주문서 기본 상품 지정 및 단가 설정 */}
+            <div className="bg-emerald-50/90 p-4 md:p-5 rounded-2xl border-2 border-emerald-400 space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <label className="block text-lg md:text-xl font-black text-emerald-950">
-                  대표 품목: 절임배추 20kg (1박스) 판매 단가 (원) <span className="text-red-600">*</span>
+                <label className="block text-base md:text-lg font-black text-emerald-950">
+                  주문서 작성 시 기본 선택 상품 지정 <span className="text-red-600">*</span>
                 </label>
-                <span className="text-xs font-black font-mono px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 whitespace-nowrap shrink-0">
-                  코드: CAB-20
+                <span className="text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
+                  신규 주문 등록 화면에 자동 기본 선택
                 </span>
               </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={price20kg}
+
+              {/* 기본 상품 선택 드롭다운 */}
+              <div className="space-y-1">
+                <select
+                  value={defaultProductId || ""}
                   onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setPrice20kg(val);
-                    if (product20Id) {
-                      setProductsList((prev) =>
-                        prev.map((item) => (item.id === product20Id ? { ...item, price: val } : item))
-                      );
-                    }
+                    const id = Number(e.target.value);
+                    setDefaultProductId(id);
+                    const prod = productsList.find((p) => p.id === id);
+                    if (prod && Number(prod.weight_kg) === 20) setPrice20kg(prod.price);
+                    if (prod && Number(prod.weight_kg) === 10) setPrice10kg(prod.price);
                   }}
-                  step="1000"
-                  className="w-full text-2xl md:text-3xl font-black border-2 border-emerald-500 rounded-xl px-4 py-2.5 stat-number bg-white text-emerald-950 focus:border-emerald-700 focus:outline-hidden"
-                  required
-                />
-              </div>
-              <div className="text-xs md:text-sm font-bold text-emerald-800">
-                현재 주문서 기본 적용 단가: {formatPrice(price20kg)}원
+                  className="w-full text-base font-bold border-2 border-emerald-500 rounded-xl px-3.5 py-2.5 bg-white text-emerald-950 focus:border-emerald-700 focus:outline-hidden"
+                >
+                  {productsList.filter((p) => p.active).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      [{p.category || "일반"}] {p.name} ({formatPrice(p.price)}원 / {p.weight_kg ? `${p.weight_kg}kg ` : ""}{p.unit || "박스"})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-emerald-800 font-medium">
+                  {(() => {
+                    const cur = productsList.find((p) => p.id === defaultProductId);
+                    return cur
+                      ? `현재 기본 상품: [${cur.name}] — 판매 단가: ${formatPrice(cur.price)}원 / 1${cur.unit || "박스"}`
+                      : "기본 상품을 선택해주세요.";
+                  })()}
+                </p>
               </div>
             </div>
 
@@ -725,11 +739,13 @@ export function SettingsView({
                       <th className="py-2.5 px-3 whitespace-nowrap">규격/단위</th>
                       <th className="py-2.5 px-3 whitespace-nowrap">판매 단가(원)</th>
                       <th className="py-2.5 px-3 text-center whitespace-nowrap">판매 상태</th>
+                      <th className="py-2.5 px-3 text-center whitespace-nowrap">기본상품</th>
                       <th className="py-2.5 px-3 text-center whitespace-nowrap">관리</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {productsList.map((p) => {
+                      const isDefault = p.id === defaultProductId;
                       const isMain20kg = p.id === product20Id;
                       return (
                         <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.active ? "" : "bg-slate-50/60 opacity-60"}`}>
@@ -744,10 +760,10 @@ export function SettingsView({
                             </span>
                           </td>
                           <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
-                            {p.name}
-                            {isMain20kg && (
-                              <span className="ml-1.5 text-[11px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black">
-                                대표
+                            <span>{p.name}</span>
+                            {isDefault && (
+                              <span className="ml-1.5 text-[11px] bg-emerald-800 text-white px-2 py-0.5 rounded font-black whitespace-nowrap">
+                                [기본 상품]
                               </span>
                             )}
                           </td>
@@ -787,7 +803,25 @@ export function SettingsView({
                             </button>
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                            {!isMain20kg && (
+                            {isDefault ? (
+                              <span className="text-xs font-bold text-emerald-800 whitespace-nowrap">
+                                현재 기본
+                              </span>
+                            ) : p.active ? (
+                              <button
+                                type="button"
+                                onClick={() => setDefaultProductId(p.id)}
+                                className="text-xs font-bold text-slate-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border border-slate-300 px-2 py-1 rounded cursor-pointer whitespace-nowrap"
+                                title="이 상품을 주문서 기본 선택 상품으로 지정"
+                              >
+                                기본 지정
+                              </button>
+                            ) : (
+                              <span className="text-xs text-slate-400 whitespace-nowrap">-</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            {!isMain20kg && !isDefault && (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteProduct(p)}
