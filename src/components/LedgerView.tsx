@@ -20,6 +20,7 @@ import {
 import { OrderEditModal } from "@/components/OrderEditModal";
 import { OrderCardData } from "@/lib/orderCardCanvas";
 import { PhoneCallLink } from "@/components/PhoneCallLink";
+import { CustomerView } from "@/components/CustomerView";
 
 interface LedgerViewProps {
   settings?: any;
@@ -667,13 +668,13 @@ export function LedgerView({ settings, onRequestConfig }: LedgerViewProps) {
   return (
     <div className="max-w-6xl mx-auto space-y-5 pb-24">
       {/* 헤더 */}
-      <div className="bg-white border-2 border-slate-300 px-5 py-4">
+      <div className="bg-white border-2 border-slate-300 px-5 py-4 rounded-2xl shadow-xs">
         <h1 className="text-xl font-bold text-slate-900">판매 및 데이터 관리</h1>
-        <p className="text-xs text-slate-500 mt-0.5">전체 판매 내역 및 고객 데이터를 관리합니다</p>
+        <p className="text-xs text-slate-500 mt-0.5">전체 판매 내역 및 단골 고객 데이터를 관리합니다</p>
       </div>
 
       {/* 탭 */}
-      <div className="flex border-b-2 border-slate-300 bg-white">
+      <div className="flex border-b-2 border-slate-300 bg-white rounded-t-xl overflow-hidden">
         <button
           onClick={() => setTab("sales")}
           className={`flex items-center gap-2 px-6 py-3.5 text-base font-bold border-b-4 transition-colors cursor-pointer ${
@@ -700,7 +701,7 @@ export function LedgerView({ settings, onRequestConfig }: LedgerViewProps) {
 
       {/* 콘텐츠 */}
       {tab === "sales" && <SalesListTab settings={settings} />}
-      {tab === "customers" && <CustomerListTab settings={settings} />}
+      {tab === "customers" && <CustomerView onRequestConfig={onRequestConfig} />}
     </div>
   );
 }
