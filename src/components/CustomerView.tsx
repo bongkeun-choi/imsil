@@ -17,6 +17,13 @@ import {
   Bookmark,
   Search,
   Edit3,
+  ShoppingBag,
+  TrendingUp,
+  CreditCard,
+  Clock,
+  ChevronRight,
+  Package,
+  UserCheck,
 } from "lucide-react";
 import {
   fetchCustomersService,
@@ -614,6 +621,26 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-nowrap shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          loadCustomerDetail(c.id);
+                          setEditCustomerCode(c.customer_code || "");
+                          setEditName(c.name || "");
+                          setEditPhone(c.phone || "");
+                          setEditPhone2(c.phone2 || "");
+                          setEditAddress(c.address || "");
+                          setEditAddressDetail(c.address_detail || "");
+                          setEditMemo(c.memo || "");
+                          openModalSafely("edit-customer");
+                        }}
+                        className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer"
+                        title="고객 정보 수정"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                        <span>수정</span>
+                      </button>
                       <a
                         href={`tel:${c.phone.replace(/[^0-9]/g, "")}`}
                         onClick={(e) => e.stopPropagation()}
@@ -633,12 +660,21 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                     </div>
                   </div>
 
-                  {/* 대표 기본 주소 */}
-                  <div className="text-xs text-slate-700 mt-1 flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>
-                      {c.address ? `${c.address} ${c.address_detail || ""}` : "등록된 기본 주소 없음"}
-                    </span>
+                  {/* 대표 기본 주소 및 추가 연락처 표시 */}
+                  <div className="space-y-0.5 mt-1">
+                    {c.phone2 && (
+                      <div className="text-xs text-slate-600 flex items-center gap-1">
+                        <span className="text-[11px] bg-slate-100 text-slate-700 border border-slate-200 px-1 rounded font-bold">
+                          추가 연락처: {c.phone2}
+                        </span>
+                      </div>
+                    )}
+                    <div className="text-xs text-slate-700 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>
+                        {c.address ? `${c.address} ${c.address_detail || ""}` : "등록된 기본 주소 없음"}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
@@ -658,65 +694,127 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
 
         {/* 우측: 고객 상세 정보 및 다중 배송지 관리 */}
         <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs">
-          <h3 className="text-base font-black text-slate-900 border-b border-slate-200 pb-2.5 mb-3 flex items-center justify-between">
-            <span>고객 상세 정보</span>
-            {selectedCustomerId && (
-              <span className="text-xs text-slate-500 font-bold">
-                고객코드 #{customerDetail?.customer?.customer_code || selectedCustomerId}
-              </span>
-            )}
-          </h3>
+          <div className="border-b border-slate-200 pb-2.5 mb-3 flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
+              <UserCheck className="w-4 h-4 text-emerald-700" />
+              <span>고객 상세 정보</span>
+            </h3>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openModalSafely("manual")}
+                className="text-xs font-bold text-slate-700 hover:text-emerald-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-1 rounded cursor-pointer whitespace-nowrap"
+              >
+                + 신규 고객 등록
+              </button>
+              {selectedCustomerId && (
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                  #{customerDetail?.customer?.customer_code || selectedCustomerId}
+                </span>
+              )}
+            </div>
+          </div>
 
           {!customerDetail ? (
-            <div className="py-16 text-center text-slate-500 text-sm">
-              왼쪽 목록에서 고객을 선택하면 상세 정보와 배송지 목록이 표시됩니다.
+            <div className="py-16 text-center text-slate-500 text-sm space-y-3">
+              <p>왼쪽 목록에서 고객을 선택하면 상세 정보, 누적 판매 통계, 배송지 목록이 표시됩니다.</p>
+              <button
+                type="button"
+                onClick={() => openModalSafely("manual")}
+                className="inline-flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>지금 새 고객 등록하기</span>
+              </button>
             </div>
           ) : (
             <div className="space-y-4 text-sm">
               {/* 고객 기본 프로필 카드 */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="text-lg font-black text-slate-900 flex items-center gap-2">
                     <span>{customerDetail.customer.name} 님</span>
                     {getCustomerGradeBadge(customerDetail.customer)}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-800">
-                      #{customerDetail.customer.customer_code}
-                    </span>
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={handleOpenEditCustomer}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-emerald-800 bg-white hover:bg-slate-100 border border-slate-300 px-2 py-0.5 rounded cursor-pointer whitespace-nowrap"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-emerald-800 bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-lg cursor-pointer whitespace-nowrap"
                     >
-                      <Edit3 className="w-3 h-3" />
-                      <span>정보수정</span>
+                      <Edit3 className="w-3.5 h-3.5 text-slate-600" />
+                      <span>고객정보 수정</span>
                     </button>
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <div className="text-sm font-bold text-slate-800 flex items-center gap-2 flex-wrap">
-                    <span>연락처1(대표): {customerDetail.customer.phone}</span>
-                    {customerDetail.customer.phone2 && (
-                      <span className="text-xs bg-slate-200 text-slate-800 font-bold px-1.5 py-0.5 rounded">
-                        연락처2: {customerDetail.customer.phone2}
+                <div className="space-y-1 text-xs text-slate-800">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-sm">대표: {customerDetail.customer.phone}</span>
+                    {customerDetail.customer.phone2 ? (
+                      <span className="bg-slate-200 text-slate-800 font-bold px-1.5 py-0.5 rounded">
+                        추가 연락처: {customerDetail.customer.phone2}
                       </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleOpenEditCustomer}
+                        className="text-[11px] text-slate-400 hover:text-slate-700 underline cursor-pointer"
+                      >
+                        + 추가연락처 등록
+                      </button>
                     )}
                   </div>
-                  {customerDetail.customer.address && (
-                    <div className="text-xs text-slate-600 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>{customerDetail.customer.address} {customerDetail.customer.address_detail || ""}</span>
-                    </div>
-                  )}
+                  <div className="text-slate-700 flex items-center gap-1.5 pt-0.5">
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>
+                      {customerDetail.customer.address
+                        ? `${customerDetail.customer.address} ${customerDetail.customer.address_detail || ""}`
+                        : "등록된 기본 주소 없음"}
+                    </span>
+                  </div>
                 </div>
 
                 {customerDetail.customer.memo && (
-                  <div className="text-xs bg-white p-2 rounded border border-slate-300 text-slate-700">
-                    [메모] {customerDetail.customer.memo}
+                  <div className="text-xs bg-white p-2.5 rounded-lg border border-slate-300 text-slate-700">
+                    <span className="font-bold text-slate-900 mr-1">[고객 특이사항]</span>
+                    {customerDetail.customer.memo}
                   </div>
                 )}
+              </div>
+
+              {/* 누적 판매 실적 & 통계 요약 대시보드 */}
+              <div className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-3 space-y-2">
+                <div className="text-xs font-bold text-emerald-950 flex items-center gap-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>누적 구매 통계</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                  <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                    <div className="text-[11px] text-slate-500 font-medium">총 주문 횟수</div>
+                    <div className="text-sm font-black text-slate-900">
+                      {customerDetail.stats?.orderCount || customerDetail.orders?.length || 0}회
+                    </div>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                    <div className="text-[11px] text-slate-500 font-medium">누적 구매 박스</div>
+                    <div className="text-sm font-black text-slate-900">
+                      {customerDetail.stats?.totalBoxes || 0}박스
+                    </div>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                    <div className="text-[11px] text-slate-500 font-medium">총 주문 금액</div>
+                    <div className="text-sm font-black text-emerald-800">
+                      {formatPrice(customerDetail.stats?.totalSpent || 0)}원
+                    </div>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-emerald-100">
+                    <div className="text-[11px] text-slate-500 font-medium">미입금 잔액</div>
+                    <div className={`text-sm font-black ${Number(customerDetail.stats?.unpaidAmount || 0) > 0 ? "text-slate-900 underline" : "text-slate-500"}`}>
+                      {formatPrice(customerDetail.stats?.unpaidAmount || 0)}원
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* 다중 배송지 주소록 섹션 */}
@@ -737,7 +835,7 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
 
                 {(!customerDetail.addresses || customerDetail.addresses.length === 0) ? (
                   <div className="text-xs text-slate-400 py-3 text-center border border-dashed border-slate-300 rounded-lg">
-                    등록된 추가 배송지가 없습니다.
+                    등록된 추가 배송지가 없습니다. (+ 배송지 추가 버튼으로 자녀·지인 배송지를 등록하세요)
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-[220px] overflow-y-auto pr-0.5">
@@ -774,7 +872,7 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                           <span>수령인: {addr.recipient_name} ({addr.recipient_phone})</span>
                           {addr.recipient_phone2 && (
                             <span className="text-[11px] bg-slate-200 text-slate-700 px-1 rounded">
-                              추가: {addr.recipient_phone2}
+                              추가연락처: {addr.recipient_phone2}
                             </span>
                           )}
                         </div>
@@ -792,31 +890,69 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                 )}
               </div>
 
-              {/* 과거 주문 이력 내역 */}
+              {/* 과거 주문 및 판매 이력 내역 (상세 표시) */}
               <div className="space-y-2 pt-1 border-t border-slate-200">
-                <div className="text-sm font-black text-slate-900">
-                  주문 기록 ({customerDetail.orders?.length || 0}건)
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                    <ShoppingBag className="w-4 h-4 text-emerald-700" />
+                    <span>판매 이력 ({customerDetail.orders?.length || 0}건)</span>
+                  </div>
+                  <span className="text-xs text-slate-500">최근 주문순</span>
                 </div>
 
                 {customerDetail.orders?.length === 0 ? (
-                  <div className="text-xs text-slate-400 py-3 text-center">주문 기록이 없습니다.</div>
+                  <div className="text-xs text-slate-400 py-3 text-center border border-dashed border-slate-300 rounded-lg">
+                    이 고객의 판매 주문 내역이 아직 없습니다.
+                  </div>
                 ) : (
-                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-0.5">
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto pr-0.5">
                     {customerDetail.orders.map((ord: any) => (
                       <div
                         key={ord.id}
-                        className="border border-slate-200 rounded-lg p-2.5 bg-slate-50 text-xs space-y-1"
+                        className="border border-slate-200 rounded-xl p-3 bg-slate-50 text-xs space-y-1.5 hover:bg-slate-100/70 transition-colors"
                       >
-                        <div className="flex justify-between font-bold text-slate-900">
-                          <span>출고일: {ord.shipping_date}</span>
-                          <span className="text-emerald-800 font-black">
+                        <div className="flex items-center justify-between font-bold text-slate-900 gap-1 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-500 font-mono">#{ord.order_no}</span>
+                            {ord.order_type === "EVENT" && (
+                              <span className="text-[10px] font-bold bg-slate-800 text-white px-1.5 py-0.5 rounded">
+                                [행사] {ord.event_name || "축제"}
+                              </span>
+                            )}
+                            <span className="text-slate-800 font-bold">출고: {ord.shipping_date}</span>
+                          </div>
+                          <span className="text-emerald-800 font-black text-sm">
                             {formatPrice(ord.total_amount)}원
                           </span>
                         </div>
-                        <div className="text-slate-500">
-                          주문번호: #{ord.order_no}
+
+                        {/* 주문 품목 요약 */}
+                        <div className="bg-white p-2 rounded border border-slate-200 text-slate-800 font-bold flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Package className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span>{ord.items_summary || "절임배추 20kg 1개"}</span>
+                          </div>
+                          {ord.total_boxes && (
+                            <span className="text-slate-600 font-medium">총 {ord.total_boxes}박스</span>
+                          )}
                         </div>
-                        <div className="flex justify-between font-bold pt-0.5">
+
+                        {/* 수령인 및 배송지 정보 (고객과 다를 경우 강조) */}
+                        <div className="text-slate-600 space-y-0.5 pt-0.5">
+                          {ord.recipient_name && ord.recipient_name !== customerDetail.customer.name && (
+                            <div className="text-slate-800 font-bold">
+                              받는 분: {ord.recipient_name} ({ord.recipient_phone || "연락처 없음"})
+                            </div>
+                          )}
+                          {ord.shipping_address && (
+                            <div className="flex items-center gap-1 text-[11px]">
+                              <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span className="truncate">{ord.shipping_address} {ord.shipping_address_detail || ""}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between font-bold pt-1 border-t border-slate-200">
                           <span className={ord.payment_status === "PAID" ? "text-emerald-800" : "text-slate-600"}>
                             {ord.payment_status === "PAID" ? "입금완료" : "미입금"}
                           </span>

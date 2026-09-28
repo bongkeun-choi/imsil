@@ -1074,21 +1074,42 @@ export async function fetchCustomerDetailService(id: number) {
 
   const ordersResult = await db.execute({
     sql: `
-      SELECT o.id, o.order_no, o.order_date, o.shipping_date, o.total_amount, o.payment_status, o.order_status,
-             (SELECT GROUP_CONCAT(oi.product_name||' '||oi.quantity||'개', ', ') FROM order_items oi WHERE oi.order_id = o.id) as items_summary
+      SELECT o.id, o.order_no, o.order_date, o.shipping_date, o.total_amount, o.paid_amount, o.payment_status, o.order_status,
+             o.recipient_name, o.recipient_phone, o.shipping_address, o.shipping_address_detail, o.order_type, o.event_name, o.memo,
+             (SELECT GROUP_CONCAT(oi.product_name||' '||oi.quantity||'개', ', ') FROM order_items oi WHERE oi.order_id = o.id) as items_summary,
+             (SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.order_id = o.id) as total_boxes
       FROM orders o
       WHERE o.customer_id = ?
-      ORDER BY o.id DESC
+      ORDER BY o.shipping_date DESC, o.id DESC
     `,
     args: [id],
   });
 
   const addresses = await fetchCustomerAddressesService(id);
 
+  // 고객 누적 판매 통계 계산
+  let totalSpent = 0;
+  let totalPaid = 0;
+  let totalBoxes = 0;
+  for (const ord of ordersResult.rows) {
+    totalSpent += Number(ord.total_amount || 0);
+    if (ord.payment_status === "PAID") {
+      totalPaid += Number(ord.total_amount || 0);
+    }
+    totalBoxes += Number(ord.total_boxes || 0);
+  }
+
   return {
     customer: customerResult.rows[0],
     orders: ordersResult.rows,
     addresses,
+    stats: {
+      orderCount: ordersResult.rows.length,
+      totalSpent,
+      totalPaid,
+      unpaidAmount: Math.max(0, totalSpent - totalPaid),
+      totalBoxes,
+    },
   };
 }
 
