@@ -7,6 +7,8 @@ import { useEffect, useRef } from "react";
  * - 모달이 열리면 window.history에 더미 상태를 push
  * - 모바일에서 뒤로가기 버튼을 누르면 popstate를 가로채 모달만 닫음 (프로그램 종료 방지)
  * - 사용자가 화면의 'X'나 '닫기' 버튼으로 닫을 경우 push했던 히스토리를 깔끔하게 정리
+ * - React StrictMode 또는 리렌더링 시 cleanup에서 의도치 않게 history.back()이 호출되어
+ *   모달이 뜨자마자 꺼지는 현상을 방지하도록 안전 가드 적용
  */
 export function useBackButtonModal(
   isOpen: boolean,
@@ -14,22 +16,29 @@ export function useBackButtonModal(
   modalId: string
 ) {
   const isBackTriggeredRef = useRef(false);
+  const isPushedRef = useRef(false);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // 모달이 닫히면 히스토리 상태 플래그 초기화
+      isPushedRef.current = false;
+      return;
+    }
 
     isBackTriggeredRef.current = false;
 
-    // 모달 전용 히스토리 상태 push
-    if (typeof window !== "undefined") {
+    // 모달 전용 히스토리 상태 push (한 번만 push)
+    if (!isPushedRef.current && typeof window !== "undefined") {
       window.history.pushState({ isModal: true, modalId }, "");
+      isPushedRef.current = true;
     }
 
-    const handlePopState = () => {
+    const handlePopState = (e: PopStateEvent) => {
       // 뒤로가기 버튼을 눌렀을 때
       isBackTriggeredRef.current = true;
+      isPushedRef.current = false;
       onCloseRef.current();
     };
 
@@ -39,13 +48,15 @@ export function useBackButtonModal(
       window.removeEventListener("popstate", handlePopState);
 
       // 만약 뒤로가기 버튼이 아닌 화면 상의 [닫기]/[X] 버튼으로 닫힌 경우,
-      // push했던 더미 히스토리를 되돌림
+      // push했던 더미 히스토리를 1회 되돌림
       if (
+        isPushedRef.current &&
         !isBackTriggeredRef.current &&
         typeof window !== "undefined" &&
         window.history.state?.isModal &&
         window.history.state?.modalId === modalId
       ) {
+        isPushedRef.current = false;
         window.history.back();
       }
     };

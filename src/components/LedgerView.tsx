@@ -447,6 +447,7 @@ function SalesListTab({ settings }: { settings?: any }) {
                     <td className="px-3 py-2.5 text-center whitespace-nowrap">
                       <div className="flex items-center gap-1 justify-center whitespace-nowrap">
                         <button
+                          type="button"
                           onClick={() => setEditingOrder(o)}
                           className="p-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 cursor-pointer shrink-0"
                           title="수정"
@@ -454,6 +455,7 @@ function SalesListTab({ settings }: { settings?: any }) {
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDeleteOrder(o.id)}
                           className="p-1.5 bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 cursor-pointer shrink-0"
                           title="삭제"
@@ -478,24 +480,7 @@ function SalesListTab({ settings }: { settings?: any }) {
 
       {editingOrder && (
         <OrderEditModal
-          order={{
-            id: editingOrder.id,
-            customer_id: editingOrder.customer_id,
-            order_no: editingOrder.order_no,
-            customer_name: editingOrder.customer_name,
-            customer_phone: editingOrder.customer_phone,
-            shipping_date: editingOrder.shipping_date,
-            shipping_address: editingOrder.shipping_address,
-            shipping_address_detail: editingOrder.shipping_address_detail || "",
-            qty20kg: Number(editingOrder.total_boxes) || 1,
-            unit_price: 68000,
-            total_amount: Number(editingOrder.total_amount) || 0,
-            payment_status: editingOrder.payment_status || "UNPAID",
-            memo: editingOrder.memo || "",
-            order_type: editingOrder.order_type || (editingOrder.event_name ? "EVENT" : "NORMAL"),
-            event_name: editingOrder.event_name || "",
-            items: [],
-          }}
+          order={editingOrder}
           isOpen={!!editingOrder}
           onClose={() => setEditingOrder(null)}
           onOrderUpdated={() => { setEditingOrder(null); load(); }}

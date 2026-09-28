@@ -86,6 +86,11 @@ export function OrderEditModal({
         q20 = Number(order.items[0].quantity) || 1;
         price = Number(order.items[0].unit_price) || 68000;
       }
+    } else if (order.total_boxes) {
+      q20 = Number(order.total_boxes) || 1;
+      if (order.total_amount) {
+        price = Math.round(Number(order.total_amount) / q20) || 68000;
+      }
     } else if (order.total_amount) {
       q20 = Math.max(1, Math.round(Number(order.total_amount) / 68000));
     }
@@ -93,7 +98,7 @@ export function OrderEditModal({
     setUnitPrice(price);
     setShowPostEditPrompt(false);
     setSavedShareData(null);
-  }, [isOpen, order]);
+  }, [isOpen, order?.id]);
 
 
 
