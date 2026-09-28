@@ -30,6 +30,10 @@ export default function Home() {
   const [orderTargetDate, setOrderTargetDate] = useState<string | undefined>(
     undefined
   );
+  const [orderPreFill, setOrderPreFill] = useState<{
+    customer?: any;
+    address?: any;
+  } | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({
     shop_name: "임실 절임배추",
     shop_phone: "010-0000-0000",
@@ -118,7 +122,14 @@ export default function Home() {
   };
 
   const handleSelectDateForNewOrder = (dateStr: string) => {
+    setOrderPreFill(null);
     setOrderTargetDate(dateStr);
+    handleTabChange("new-order");
+  };
+
+  const handleSelectCustomerForOrder = (customer: any, address?: any) => {
+    setOrderPreFill({ customer, address });
+    setOrderTargetDate(undefined);
     handleTabChange("new-order");
   };
 
@@ -209,7 +220,12 @@ export default function Home() {
           <NewOrderView
             settings={settings}
             initialShippingDate={orderTargetDate}
-            onOrderSaved={() => handleTabChange("dashboard")}
+            preFillCustomer={orderPreFill?.customer}
+            preFillAddress={orderPreFill?.address}
+            onOrderSaved={() => {
+              setOrderPreFill(null);
+              handleTabChange("dashboard");
+            }}
             onRequestConfig={() => {}}
           />
         )}
@@ -221,7 +237,11 @@ export default function Home() {
 
         {/* 5. 장부 관리 (판매 리스트 + 고객 리스트) */}
         {activeTab === "ledger" && (
-          <LedgerView settings={settings} onRequestConfig={() => {}} />
+          <LedgerView
+            settings={settings}
+            onRequestConfig={() => {}}
+            onSelectCustomerForOrder={handleSelectCustomerForOrder}
+          />
         )}  
 
         {/* 6. 설정 */}

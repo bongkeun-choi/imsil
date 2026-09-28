@@ -682,6 +682,199 @@ export async function createOrderService(data: {
   return { orderId, orderNo };
 }
 
+export interface MultiDestinationItem {
+  alias?: string;
+  recipient_name: string;
+  recipient_phone: string;
+  recipient_phone2?: string;
+  address: string;
+  address_detail?: string;
+  shipping_date: string;
+  quantity: number; // 20kg 박스 수
+  memo?: string;
+  save_as_address?: boolean;
+}
+
+export interface CreateMultiDestinationOrderPayload {
+  customer_id?: number;
+  customer_name: string;
+  customer_phone: string;
+  customer_phone2?: string;
+  payment_status: "UNPAID" | "PAID";
+  product: {
+    id: number;
+    name: string;
+    price: number;
+    weight_kg: number;
+  };
+  destinations: MultiDestinationItem[];
+  order_type?: "NORMAL" | "EVENT";
+  event_name?: string | null;
+}
+
+export async function createMultiDestinationOrderService(data: CreateMultiDestinationOrderPayload) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+
+  const now = new Date().toISOString();
+  const todayStr = format(new Date(), "yyyyMMdd");
+
+  // 1. 주문 고객 생성 또는 조회
+  let customerId: number;
+  if (data.customer_id) {
+    customerId = data.customer_id;
+  } else {
+    const existing = await db.execute({
+      sql: "SELECT id FROM customers WHERE REPLACE(phone, '-', '') = ? LIMIT 1",
+      args: [data.customer_phone.replace(/[^0-9]/g, "")],
+    });
+
+    if (existing.rows.length > 0) {
+      customerId = Number(existing.rows[0].id);
+    } else {
+      const custCode = await generateCustomerCode(db, data.customer_name);
+      const custResult = await db.execute({
+        sql: `INSERT INTO customers (customer_code, name, phone, phone2, address, address_detail, memo, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, '', ?, ?)`,
+        args: [
+          custCode,
+          data.customer_name.trim(),
+          data.customer_phone.trim(),
+          data.customer_phone2?.trim() || "",
+          data.destinations[0]?.address.trim() || "",
+          data.destinations[0]?.address_detail?.trim() || "",
+          now,
+          now,
+        ],
+      });
+      customerId = Number(custResult.lastInsertRowid);
+    }
+  }
+
+  const createdOrders: Array<{ orderId: number; orderNo: string; destination: MultiDestinationItem; amount: number }> = [];
+
+  // 2. 각 배송지별 주문 순차 생성
+  for (let i = 0; i < data.destinations.length; i++) {
+    const dest = data.destinations[i];
+    if (dest.quantity <= 0) continue;
+
+    // 주문번호 발급 (날짜-순번)
+    const todayCountResult = await db.execute({
+      sql: "SELECT COUNT(*) as cnt FROM orders WHERE order_no LIKE ?",
+      args: [`${todayStr}-%`],
+    });
+    const nextSeq = Number(todayCountResult.rows[0].cnt) + 1;
+    const orderNo = `${todayStr}-${String(nextSeq).padStart(3, "0")}`;
+
+    const orderAmount = Number(data.product.price) * Number(dest.quantity);
+    const paidAmount = data.payment_status === "PAID" ? orderAmount : 0;
+    const orderType = data.order_type || "NORMAL";
+    const eventName = orderType === "EVENT" ? (data.event_name?.trim() || "임실 김치 축제") : null;
+
+    const finalRecipientName = (dest.recipient_name || data.customer_name).trim();
+    const finalRecipientPhone = (dest.recipient_phone || data.customer_phone).trim();
+
+    const orderResult = await db.execute({
+      sql: `INSERT INTO orders (
+              order_no, customer_id, customer_name, customer_phone,
+              recipient_name, recipient_phone,
+              shipping_address, shipping_address_detail, order_date,
+              shipping_date, total_amount, paid_amount, payment_status,
+              order_status, memo, order_type, event_name, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?, ?, ?, ?)`,
+      args: [
+        orderNo,
+        customerId,
+        data.customer_name.trim(),
+        data.customer_phone.trim(),
+        finalRecipientName,
+        finalRecipientPhone,
+        dest.address.trim(),
+        dest.address_detail ? dest.address_detail.trim() : "",
+        format(new Date(), "yyyy-MM-dd"),
+        dest.shipping_date,
+        orderAmount,
+        paidAmount,
+        data.payment_status,
+        dest.memo ? dest.memo.trim() : "",
+        orderType,
+        eventName,
+        now,
+        now,
+      ],
+    });
+
+    const orderId = Number(orderResult.lastInsertRowid);
+
+    // 품목 등록
+    await db.execute({
+      sql: `INSERT INTO order_items (
+              order_id, product_id, product_name, quantity, unit_price, weight_kg, amount
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        orderId,
+        data.product.id,
+        data.product.name,
+        dest.quantity,
+        data.product.price,
+        data.product.weight_kg,
+        orderAmount,
+      ],
+    });
+
+    // 입금 등록
+    if (data.payment_status === "PAID") {
+      await db.execute({
+        sql: `INSERT INTO payments (order_id, amount, paid_at, payer_name, method, created_at)
+              VALUES (?, ?, ?, ?, '계좌이체', ?)`,
+        args: [orderId, orderAmount, now, data.customer_name, now],
+      });
+    }
+
+    // 배송 레코드 등록
+    await db.execute({
+      sql: `INSERT INTO shipments (order_id, courier, tracking_no, status, created_at, updated_at)
+            VALUES (?, '우체국택배', '', 'READY', ?, ?)`,
+      args: [orderId, now, now],
+    });
+
+    // 배송지 자동 주소록 등록
+    if (dest.save_as_address && dest.address.trim()) {
+      try {
+        await addCustomerAddressService({
+          customer_id: customerId,
+          alias: dest.alias?.trim() || `${finalRecipientName} 배송지`,
+          recipient_name: finalRecipientName,
+          recipient_phone: finalRecipientPhone,
+          recipient_phone2: dest.recipient_phone2?.trim() || undefined,
+          address: dest.address.trim(),
+          address_detail: dest.address_detail?.trim() || undefined,
+          delivery_memo: dest.memo?.trim() || undefined,
+        });
+      } catch (e) {
+        console.error("다중 배송지 주소록 추가 실패(무시):", e);
+      }
+    }
+
+    createdOrders.push({
+      orderId,
+      orderNo,
+      destination: dest,
+      amount: orderAmount,
+    });
+  }
+
+  return {
+    customerId,
+    customerName: data.customer_name,
+    customerPhone: data.customer_phone,
+    totalCount: createdOrders.length,
+    totalBoxes: data.destinations.reduce((acc, d) => acc + d.quantity, 0),
+    totalAmount: createdOrders.reduce((acc, o) => acc + o.amount, 0),
+    orders: createdOrders,
+  };
+}
+
 export async function fetchOrdersService(dateStr: string) {
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");

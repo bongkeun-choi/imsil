@@ -25,6 +25,7 @@ import { CustomerView } from "@/components/CustomerView";
 interface LedgerViewProps {
   settings?: any;
   onRequestConfig: () => void;
+  onSelectCustomerForOrder?: (customer: any, address?: any) => void;
 }
 
 type LedgerTab = "sales" | "customers";
@@ -662,7 +663,7 @@ function CustomerListTab({ settings }: { settings?: any }) {
 // ──────────────────────────────────────────────
 // 메인 LedgerView
 // ──────────────────────────────────────────────
-export function LedgerView({ settings, onRequestConfig }: LedgerViewProps) {
+export function LedgerView({ settings, onRequestConfig, onSelectCustomerForOrder }: LedgerViewProps) {
   const [tab, setTab] = useState<LedgerTab>("sales");
 
   return (
@@ -701,7 +702,12 @@ export function LedgerView({ settings, onRequestConfig }: LedgerViewProps) {
 
       {/* 콘텐츠 */}
       {tab === "sales" && <SalesListTab settings={settings} />}
-      {tab === "customers" && <CustomerView onRequestConfig={onRequestConfig} />}
+      {tab === "customers" && (
+        <CustomerView
+          onRequestConfig={onRequestConfig}
+          onSelectAddressForOrder={onSelectCustomerForOrder}
+        />
+      )}
     </div>
   );
 }

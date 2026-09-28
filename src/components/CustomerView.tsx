@@ -46,9 +46,10 @@ import {
 
 interface CustomerViewProps {
   onRequestConfig: () => void;
+  onSelectAddressForOrder?: (customer: any, address?: CustomerAddress) => void;
 }
 
-export function CustomerView({ onRequestConfig }: CustomerViewProps) {
+export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: CustomerViewProps) {
   const [query, setQuery] = useState("");
   const [customers, setCustomers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -736,7 +737,17 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                     <span>{customerDetail.customer.name} 님</span>
                     {getCustomerGradeBadge(customerDetail.customer)}
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {onSelectAddressForOrder && (
+                      <button
+                        type="button"
+                        onClick={() => onSelectAddressForOrder(customerDetail.customer)}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-2.5 py-1 rounded-lg cursor-pointer whitespace-nowrap shadow-xs"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <span>이 고객으로 새 주문</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleOpenEditCustomer}
@@ -848,7 +859,18 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                           <span className="font-bold text-emerald-900 bg-emerald-100 px-1.5 py-0.5 rounded">
                             [{addr.alias || "배송지"}]
                           </span>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
+                            {onSelectAddressForOrder && (
+                              <button
+                                type="button"
+                                onClick={() => onSelectAddressForOrder(customerDetail.customer, addr)}
+                                className="text-emerald-800 hover:text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                title="이 배송지로 바로 주문 등록하기"
+                              >
+                                <Package className="w-3 h-3" />
+                                <span>이 주소로 주문</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleOpenEditAddress(addr)}

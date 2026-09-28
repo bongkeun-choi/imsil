@@ -20,6 +20,9 @@ import {
   Package,
   CalendarCheck,
   Info,
+  Users,
+  Trash2,
+  Split,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
@@ -28,6 +31,8 @@ import {
   fetchCustomerAddressesService,
   addCustomerAddressService,
   createOrderService,
+  createMultiDestinationOrderService,
+  MultiDestinationItem,
   CustomerAddress,
 } from "@/lib/services";
 import { recognizeTextFromImage, OcrProgress } from "@/lib/ocrClient";
@@ -54,6 +59,8 @@ interface NewOrderViewProps {
   onOrderSaved: () => void;
   onRequestConfig: () => void;
   initialShippingDate?: string;
+  preFillCustomer?: any;
+  preFillAddress?: CustomerAddress;
 }
 
 export function NewOrderView({
@@ -61,6 +68,8 @@ export function NewOrderView({
   onOrderSaved,
   onRequestConfig,
   initialShippingDate,
+  preFillCustomer,
+  preFillAddress,
 }: NewOrderViewProps) {
   // 1. 주문서 기본 입력 폼 상태
   const [phone, setPhone] = useState("");
@@ -91,6 +100,79 @@ export function NewOrderView({
   const [recipientPhone, setRecipientPhone] = useState("");
   const [recipientPhone2, setRecipientPhone2] = useState("");
   const [differentRecipient, setDifferentRecipient] = useState(false);
+
+  // 한 사람이 여러 사람에게 보낼 때: 1인 다처 다중 배송 모드
+  const [isMultiDest, setIsMultiDest] = useState(false);
+  const [destinations, setDestinations] = useState<MultiDestinationItem[]>([
+    {
+      alias: "배송지 1",
+      recipient_name: "",
+      recipient_phone: "",
+      recipient_phone2: "",
+      address: "",
+      address_detail: "",
+      shipping_date: initialShippingDate || format(addDays(new Date(), 2), "yyyy-MM-dd"),
+      quantity: 1,
+      memo: "",
+      save_as_address: true,
+    },
+  ]);
+
+  // 배송지 추가
+  const handleAddDestination = () => {
+    setDestinations((prev) => [
+      ...prev,
+      {
+        alias: `배송지 ${prev.length + 1}`,
+        recipient_name: "",
+        recipient_phone: "",
+        recipient_phone2: "",
+        address: "",
+        address_detail: "",
+        shipping_date: shippingDate,
+        quantity: 1,
+        memo: "",
+        save_as_address: true,
+      },
+    ]);
+  };
+
+  // 배송지 삭제
+  const handleRemoveDestination = (index: number) => {
+    if (destinations.length <= 1) {
+      alert("배송지는 최소 1곳 이상이어야 합니다.");
+      return;
+    }
+    setDestinations((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // 배송지 값 수정
+  const handleUpdateDestination = (index: number, field: keyof MultiDestinationItem, value: any) => {
+    setDestinations((prev) =>
+      prev.map((d, i) => (i === index ? { ...d, [field]: value } : d))
+    );
+  };
+
+  // 등록된 주소록에서 특정 배송지 카드에 적용
+  const handleApplyAddressToDestination = (index: number, addr: CustomerAddress) => {
+    setDestinations((prev) =>
+      prev.map((d, i) =>
+        i === index
+          ? {
+              ...d,
+              alias: addr.alias || d.alias,
+              recipient_name: addr.recipient_name,
+              recipient_phone: addr.recipient_phone,
+              recipient_phone2: addr.recipient_phone2 || "",
+              address: addr.address,
+              address_detail: addr.address_detail || "",
+              memo: addr.delivery_memo || d.memo,
+              save_as_address: false,
+            }
+          : d
+      )
+    );
+  };
 
   // 모바일 뒤로가기 버튼 시 주문 완료 안내 팝업 닫기
   useBackButtonModal(
@@ -200,6 +282,17 @@ export function NewOrderView({
       setSelectedAddressId(null);
     }
   };
+
+  // 외부(고객 관리 화면 등)에서 전달된 고객 및 배송지 정보 자동 반영
+  useEffect(() => {
+    if (preFillCustomer) {
+      selectExistingCustomer(preFillCustomer).then(() => {
+        if (preFillAddress) {
+          applyAddress(preFillAddress);
+        }
+      });
+    }
+  }, [preFillCustomer, preFillAddress]);
 
   // 스마트폰 연락처에서 가져오기
   const handlePickContactForOrder = async () => {
@@ -330,7 +423,7 @@ export function NewOrderView({
     }
   };
 
-  // 단가 계산 (현재 20kg 단일 규격 중심)
+  // 단가 및 총액 계산 (단일 배송 vs 다중 배송)
   const product20 = products.find((p) => Number(p.weight_kg) === 20) || {
     id: 2,
     name: "절임배추 20kg",
@@ -338,20 +431,99 @@ export function NewOrderView({
     weight_kg: 20,
   };
 
-  const totalAmount = qty20kg * Number(product20.price);
+  const totalBoxes = isMultiDest
+    ? destinations.reduce((sum, d) => sum + Number(d.quantity || 0), 0)
+    : qty20kg;
+
+  const totalAmount = totalBoxes * Number(product20.price);
 
   // --- 최종 주문 등록 제출 ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
-      alert(isEvent ? "납품처 / 수령처 이름을 입력해 주세요." : "고객 이름을 입력해 주세요.");
+      alert(isEvent ? "납품처 / 수령처 이름을 입력해 주세요." : "주문 고객 이름을 입력해 주세요.");
       return;
     }
     if (!isEvent && !phone.trim()) {
-      alert("전화번호를 입력해 주세요.");
+      alert("주문 고객 전화번호를 입력해 주세요.");
       return;
     }
+
+    // 다중 배송지 모드 제출 처리
+    if (isMultiDest) {
+      if (destinations.length === 0) {
+        alert("배송지를 1곳 이상 추가해 주세요.");
+        return;
+      }
+      for (let i = 0; i < destinations.length; i++) {
+        const d = destinations[i];
+        if (!d.recipient_name.trim()) {
+          alert(`[배송지 ${i + 1}] 받는 분 성함을 입력해 주세요.`);
+          return;
+        }
+        if (!d.address.trim()) {
+          alert(`[배송지 ${i + 1}] 배송 주소를 입력해 주세요.`);
+          return;
+        }
+        if (d.quantity < 1) {
+          alert(`[배송지 ${i + 1}] 수량을 1박스 이상 입력해 주세요.`);
+          return;
+        }
+      }
+
+      setIsSubmitting(true);
+      try {
+        const multiRes = await createMultiDestinationOrderService({
+          customer_id: selectedCustomer?.id ? Number(selectedCustomer.id) : undefined,
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          payment_status: paymentStatus,
+          product: {
+            id: product20.id,
+            name: product20.name,
+            price: product20.price,
+            weight_kg: product20.weight_kg,
+          },
+          destinations,
+          order_type: isEvent ? "EVENT" : "NORMAL",
+          event_name: isEvent ? (eventName.trim() || "임실 김치 축제") : null,
+        });
+
+        alert(`총 ${multiRes.totalCount}곳의 배송지로 주문이 일괄 등록되었습니다! (총 ${multiRes.totalBoxes}박스)`);
+
+        const firstOrder = multiRes.orders[0];
+        const shareData: OrderCardData = {
+          orderNo: `${firstOrder?.orderNo || "MULTI"} 외 ${multiRes.totalCount - 1}건`,
+          customerName: name.trim(),
+          customerPhone: phone.trim(),
+          shippingDate: destinations[0]?.shipping_date || shippingDate,
+          shippingAddress: `${destinations[0]?.recipient_name} 등 총 ${multiRes.totalCount}곳 배송`,
+          shippingAddressDetail: "",
+          itemsSummary: `절임배추 20kg 총 ${multiRes.totalBoxes}박스 (${multiRes.totalCount}곳 배송)`,
+          totalAmount: multiRes.totalAmount,
+          paymentStatus,
+          memo: `[다중 배송] ${destinations.map(d => `${d.recipient_name}(${d.quantity}박스)`).join(", ")}`,
+          shopName: settings.shop_name || "임실참배추농원",
+          shopPhone: settings.shop_phone || (settings as any).phone || "010-0000-0000",
+          extraPhones: parseExtraPhones(settings.extra_phones),
+          shareMessageTemplate: settings.share_message_template,
+          bankName: settings.bank_name || "농협",
+          bankAccount: settings.bank_account || "351-0000-0000-00",
+          ownerName: settings.owner_name || "대표자",
+        };
+        setCreatedOrderShareData(shareData);
+        setShowPostOrderPrompt(true);
+        return;
+      } catch (err: any) {
+        alert("다중 배송 주문 등록 실패: " + err.message);
+        return;
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+
+    // 단일 배송 모드 제출 처리
     if (!isEvent && !address.trim()) {
       alert("배송지 주소를 입력해 주세요.");
       return;
@@ -836,247 +1008,549 @@ export function NewOrderView({
                 </div>
               </div>
 
-              {/* 주문 고객과 받는 분이 다른 경우 (예: 자녀, 친척에게 보내는 경우) */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-800">
-                  <input
-                    type="checkbox"
-                    checked={differentRecipient}
-                    onChange={(e) => {
-                      setDifferentRecipient(e.target.checked);
-                      if (!e.target.checked) {
-                        setRecipientName(name);
-                        setRecipientPhone(phone);
+              {/* 배송지 모드 선택: 1곳 배송 vs 여러 사람에게 보내기 (다중 배송) */}
+              <div className="bg-emerald-50/60 border border-emerald-300 rounded-xl p-3 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <label className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                    <Split className="w-4 h-4 text-emerald-700" />
+                    <span>배송 방식 선택</span>
+                  </label>
+                  <span className="text-xs text-slate-500">
+                    한 분이 여러 가족/지인에게 보낼 땐 [여러 곳으로 발송]을 선택하세요
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsMultiDest(false)}
+                    className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all border whitespace-nowrap ${
+                      !isMultiDest
+                        ? "bg-emerald-700 text-white border-emerald-800 shadow-xs"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Package className="w-4 h-4 shrink-0" />
+                    <span>한 곳으로 배송 (단일 배송)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMultiDest(true);
+                      if (destinations.length === 1 && !destinations[0].address) {
+                        setDestinations([
+                          {
+                            alias: "서울 딸네",
+                            recipient_name: recipientName || "",
+                            recipient_phone: recipientPhone || "",
+                            recipient_phone2: "",
+                            address: address || "",
+                            address_detail: addressDetail || "",
+                            shipping_date: shippingDate,
+                            quantity: 1,
+                            memo: "",
+                            save_as_address: true,
+                          },
+                        ]);
                       }
                     }}
-                    className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-                  />
-                  <span>받는 분(수령인)이 주문 고객과 다릅니다 (가족·선물 발송)</span>
-                </label>
-
-                {differentRecipient && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200 animate-in fade-in duration-100">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">
-                        받는 분 성함 <span className="text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={recipientName}
-                        onChange={(e) => setRecipientName(e.target.value)}
-                        placeholder="예: 김딸, 박아들"
-                        className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
-                        required={differentRecipient}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-800 mb-1">
-                        받는 분 연락처 <span className="text-red-600">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        value={recipientPhone}
-                        onChange={(e) => setRecipientPhone(formatPhone(e.target.value))}
-                        placeholder="예: 010-9876-5432"
-                        className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
-                        required={differentRecipient}
-                      />
-                    </div>
-                  </div>
-                )}
+                    className={`py-2 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all border whitespace-nowrap ${
+                      isMultiDest
+                        ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Users className="w-4 h-4 shrink-0" />
+                    <span>여러 사람에게 나누어 보내기 ({destinations.length}곳)</span>
+                  </button>
+                </div>
               </div>
 
-              {/* 다중 배송지 선택 인터페이스 (기존 고객 선택 시) */}
-              {selectedCustomer && customerAddresses.length > 0 && (
-                <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>{selectedCustomer.name} 님의 등록 배송지 ({customerAddresses.length}곳)</span>
+              {/* ─────────────────────────────────────────────────── */}
+              {/* [모드 A] 여러 곳으로 나누어 보내기 (다중 배송지 모드) */}
+              {/* ─────────────────────────────────────────────────── */}
+              {isMultiDest ? (
+                <div className="space-y-3 pt-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-sm font-black text-slate-900 flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-emerald-700" />
+                      <span>배송지 및 수령인 목록 ({destinations.length}곳 / 총 {totalBoxes}박스)</span>
                     </span>
-                    <span className="text-xs text-slate-500">배송지를 누르면 바로 변경됩니다</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 overflow-x-auto">
-                    {customerAddresses.map((addr) => {
-                      const isSelected = selectedAddressId === addr.id;
-                      return (
-                        <button
-                          key={addr.id}
-                          type="button"
-                          onClick={() => applyAddress(addr)}
-                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
-                            isSelected
-                              ? "bg-emerald-700 text-white border-emerald-800 shadow-xs"
-                              : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
-                          }`}
-                        >
-                          <span className={isSelected ? "text-emerald-100" : "text-emerald-700"}>
-                            [{addr.alias || "배송지"}]
-                          </span>
-                          <span>{addr.recipient_name} ({addr.recipient_phone})</span>
-                        </button>
-                      );
-                    })}
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedAddressId(null);
-                        setAddress("");
-                        setAddressDetail("");
-                      }}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border border-dashed cursor-pointer transition-all whitespace-nowrap shrink-0 ${
-                        selectedAddressId === null
-                          ? "bg-slate-200 text-slate-900 border-slate-400"
-                          : "bg-white text-slate-600 border-slate-300 hover:bg-slate-100"
-                      }`}
+                      onClick={handleAddDestination}
+                      className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg cursor-pointer shadow-xs whitespace-nowrap"
                     >
-                      + 새 배송지로 직접 입력
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ 배송지 추가하기</span>
                     </button>
+                  </div>
+
+                  {destinations.map((dest, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-slate-50 border-2 border-slate-300 rounded-xl p-3.5 space-y-3 relative animate-in fade-in duration-100"
+                    >
+                      {/* 배송지 카드 헤더 */}
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="bg-emerald-800 text-white text-xs font-bold px-2 py-0.5 rounded">
+                            배송지 {idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            value={dest.alias || ""}
+                            onChange={(e) => handleUpdateDestination(idx, "alias", e.target.value)}
+                            placeholder="별칭 (예: 서울 딸네, 부산 아들네, 시댁)"
+                            className="text-xs font-bold border border-slate-300 rounded px-2 py-0.5 bg-white text-slate-800 focus:border-emerald-600 focus:outline-hidden"
+                          />
+                        </div>
+
+                        {destinations.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDestination(idx)}
+                            className="inline-flex items-center gap-0.5 text-xs text-slate-400 hover:text-red-600 cursor-pointer p-1"
+                            title="이 배송지 삭제"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>삭제</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 고객 등록 주소록에서 빠른 선택 */}
+                      {selectedCustomer && customerAddresses.length > 0 && (
+                        <div className="flex items-center gap-1.5 overflow-x-auto text-xs py-1">
+                          <span className="font-bold text-slate-500 whitespace-nowrap">주소록에서 선택:</span>
+                          {customerAddresses.map((addr) => (
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => handleApplyAddressToDestination(idx, addr)}
+                              className="px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-emerald-50 text-slate-700 text-xs font-bold whitespace-nowrap cursor-pointer"
+                            >
+                              [{addr.alias || "배송지"}] {addr.recipient_name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 받는 분 성함 & 연락처 */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            받는 분 성함 <span className="text-red-600">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={dest.recipient_name}
+                            onChange={(e) => handleUpdateDestination(idx, "recipient_name", e.target.value)}
+                            placeholder="예: 김딸, 박아들"
+                            className="w-full text-sm font-bold border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            받는 분 연락처 1
+                          </label>
+                          <input
+                            type="tel"
+                            value={dest.recipient_phone}
+                            onChange={(e) => handleUpdateDestination(idx, "recipient_phone", formatPhone(e.target.value))}
+                            placeholder="010-0000-0000"
+                            className="w-full text-sm font-bold border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            추가 연락처 2 (선택)
+                          </label>
+                          <input
+                            type="tel"
+                            value={dest.recipient_phone2 || ""}
+                            onChange={(e) => handleUpdateDestination(idx, "recipient_phone2", formatPhone(e.target.value))}
+                            placeholder="집/추가번호"
+                            className="w-full text-sm font-bold border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 배송 주소 & 상세 주소 */}
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-800">
+                          배송 주소 <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={dest.address}
+                          onChange={(e) => handleUpdateDestination(idx, "address", e.target.value)}
+                          placeholder="도로명 또는 지번 주소"
+                          className="w-full text-sm font-bold border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                          required
+                        />
+                        <input
+                          type="text"
+                          value={dest.address_detail || ""}
+                          onChange={(e) => handleUpdateDestination(idx, "address_detail", e.target.value)}
+                          placeholder="동/호수 등 상세 주소"
+                          className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                        />
+                      </div>
+
+                      {/* 이 배송지로 보낼 수량(박스) & 도착 희망일 & 요청사항 */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-slate-200">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            발송 수량 (20kg 박스) <span className="text-red-600">*</span>
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDestination(idx, "quantity", Math.max(1, (dest.quantity || 1) - 1))}
+                              className="w-8 h-8 rounded border border-slate-300 bg-white font-bold hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="w-10 text-center font-black text-sm text-slate-900">
+                              {dest.quantity}박스
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDestination(idx, "quantity", (dest.quantity || 1) + 1)}
+                              className="w-8 h-8 rounded border border-emerald-400 bg-emerald-700 text-white font-bold hover:bg-emerald-800 flex items-center justify-center cursor-pointer"
+                            >
+                              +
+                            </button>
+                            <span className="text-xs text-emerald-800 font-bold ml-1">
+                              {formatPrice(dest.quantity * Number(product20.price))}원
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            도착 희망일
+                          </label>
+                          <input
+                            type="date"
+                            value={dest.shipping_date}
+                            onChange={(e) => handleUpdateDestination(idx, "shipping_date", e.target.value)}
+                            className="w-full text-xs font-bold border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            배송 요청사항
+                          </label>
+                          <input
+                            type="text"
+                            value={dest.memo || ""}
+                            onChange={(e) => handleUpdateDestination(idx, "memo", e.target.value)}
+                            placeholder="예: 문 앞 보관"
+                            className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:border-emerald-600 focus:outline-hidden"
+                          />
+                        </div>
+                      </div>
+
+                      {/* 고객 주소록 자동 추가 체크 */}
+                      {selectedCustomer && (
+                        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer pt-0.5">
+                          <input
+                            type="checkbox"
+                            checked={dest.save_as_address !== false}
+                            onChange={(e) => handleUpdateDestination(idx, "save_as_address", e.target.checked)}
+                            className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                          />
+                          <span>이 배송지를 고객 주소록에 자동 등록</span>
+                        </label>
+                      )}
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={handleAddDestination}
+                    className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 border-2 border-dashed border-slate-300 text-slate-800 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ 배송지 추가하기 (현재 {destinations.length}곳)</span>
+                  </button>
+                </div>
+              ) : (
+                /* ─────────────────────────────────────────────────── */
+                /* [모드 B] 한 곳으로 배송 (기본 단일 배송 모드) */
+                /* ─────────────────────────────────────────────────── */
+                <div className="space-y-3">
+                  {/* 주문 고객과 받는 분이 다른 경우 (예: 자녀, 친척에게 보내는 경우) */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={differentRecipient}
+                        onChange={(e) => {
+                          setDifferentRecipient(e.target.checked);
+                          if (!e.target.checked) {
+                            setRecipientName(name);
+                            setRecipientPhone(phone);
+                          }
+                        }}
+                        className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                      />
+                      <span>받는 분(수령인)이 주문 고객과 다릅니다 (가족·선물 발송)</span>
+                    </label>
+
+                    {differentRecipient && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200 animate-in fade-in duration-100">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            받는 분 성함 <span className="text-red-600">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={recipientName}
+                            onChange={(e) => setRecipientName(e.target.value)}
+                            placeholder="예: 김딸, 박아들"
+                            className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
+                            required={differentRecipient}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-800 mb-1">
+                            받는 분 연락처 <span className="text-red-600">*</span>
+                          </label>
+                          <input
+                            type="tel"
+                            value={recipientPhone}
+                            onChange={(e) => setRecipientPhone(formatPhone(e.target.value))}
+                            placeholder="예: 010-9876-5432"
+                            className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
+                            required={differentRecipient}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 다중 배송지 선택 인터페이스 (기존 고객 선택 시) */}
+                  {selectedCustomer && customerAddresses.length > 0 && (
+                    <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>{selectedCustomer.name} 님의 등록 배송지 ({customerAddresses.length}곳)</span>
+                        </span>
+                        <span className="text-xs text-slate-500">배송지를 누르면 바로 변경됩니다</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 overflow-x-auto">
+                        {customerAddresses.map((addr) => {
+                          const isSelected = selectedAddressId === addr.id;
+                          return (
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => applyAddress(addr)}
+                              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
+                                isSelected
+                                  ? "bg-emerald-700 text-white border-emerald-800 shadow-xs"
+                                  : "bg-white text-slate-800 border-slate-300 hover:bg-slate-100"
+                              }`}
+                            >
+                              <span className={isSelected ? "text-emerald-100" : "text-emerald-700"}>
+                                [{addr.alias || "배송지"}]
+                              </span>
+                              <span>{addr.recipient_name} ({addr.recipient_phone})</span>
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedAddressId(null);
+                            setAddress("");
+                            setAddressDetail("");
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold border border-dashed cursor-pointer transition-all whitespace-nowrap shrink-0 ${
+                            selectedAddressId === null
+                              ? "bg-slate-200 text-slate-900 border-slate-400"
+                              : "bg-white text-slate-600 border-slate-300 hover:bg-slate-100"
+                          }`}
+                        >
+                          + 새 배송지로 직접 입력
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 배송지 주소 입력 */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-base font-bold text-slate-900">
+                        배송 주소 <span className="text-red-600">*</span>
+                      </label>
+                      {selectedCustomer && selectedAddressId === null && (
+                        <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={saveAsNewAddress}
+                            onChange={(e) => setSaveAsNewAddress(e.target.checked)}
+                            className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                          />
+                          <span>이 배송지를 고객 주소록에 추가</span>
+                        </label>
+                      )}
+                    </div>
+
+                    {selectedCustomer && selectedAddressId === null && saveAsNewAddress && (
+                      <div className="mb-1.5">
+                        <input
+                          type="text"
+                          value={newAddressLabel}
+                          onChange={(e) => setNewAddressLabel(e.target.value)}
+                          placeholder="배송지 명칭 입력 (예: 서울 딸네, 부산 아들네, 회사)"
+                          className="w-full text-xs border border-emerald-300 rounded-lg px-2.5 py-1.5 bg-emerald-50 text-emerald-950 focus:border-emerald-600 focus:outline-hidden"
+                        />
+                      </div>
+                    )}
+
+                    <input
+                      type="text"
+                      value={address}
+                      onChange={(e) => {
+                        setAddress(e.target.value);
+                        if (selectedAddressId) setSelectedAddressId(null);
+                      }}
+                      placeholder="시·군·구·도로명 또는 지번 주소"
+                      className="w-full text-sm font-bold border border-slate-300 rounded-xl px-3 py-2 mb-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
+                      required={!isMultiDest}
+                    />
+                    <input
+                      type="text"
+                      value={addressDetail}
+                      onChange={(e) => setAddressDetail(e.target.value)}
+                      placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
+                      className="w-full text-sm border border-slate-300 rounded-xl px-3 py-2 focus:border-emerald-600 focus:outline-hidden bg-white"
+                    />
                   </div>
                 </div>
               )}
-
-              {/* 배송지 주소 입력 */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-base font-bold text-slate-900">
-                    배송 주소 <span className="text-red-600">*</span>
-                  </label>
-                  {selectedCustomer && selectedAddressId === null && (
-                    <label className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={saveAsNewAddress}
-                        onChange={(e) => setSaveAsNewAddress(e.target.checked)}
-                        className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
-                      />
-                      <span>이 배송지를 고객 주소록에 추가</span>
-                    </label>
-                  )}
-                </div>
-
-                {selectedCustomer && selectedAddressId === null && saveAsNewAddress && (
-                  <div className="mb-1.5">
-                    <input
-                      type="text"
-                      value={newAddressLabel}
-                      onChange={(e) => setNewAddressLabel(e.target.value)}
-                      placeholder="배송지 명칭 입력 (예: 서울 딸네, 부산 아들네, 회사)"
-                      className="w-full text-xs border border-emerald-300 rounded-lg px-2.5 py-1.5 bg-emerald-50 text-emerald-950 focus:border-emerald-600 focus:outline-hidden"
-                    />
-                  </div>
-                )}
-
-                <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => {
-                    setAddress(e.target.value);
-                    if (selectedAddressId) setSelectedAddressId(null);
-                  }}
-                  placeholder="시·군·구·도로명 또는 지번 주소"
-                  className="w-full text-sm font-bold border border-slate-300 rounded-xl px-3 py-2 mb-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
-                  required
-                />
-                <input
-                  type="text"
-                  value={addressDetail}
-                  onChange={(e) => setAddressDetail(e.target.value)}
-                  placeholder="동/호수, 마을이름 등 상세 주소 (선택)"
-                  className="w-full text-sm border border-slate-300 rounded-xl px-3 py-2 focus:border-emerald-600 focus:outline-hidden bg-white"
-                />
-              </div>
             </div>
           )}
 
-          {/* 상품 단위 및 수량 선택 (절임배추 20kg 단일 규격) */}
-          <div className="border-t border-b border-slate-200 py-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-slate-900">
-                주문 상품 및 수량
-              </h3>
-              <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md whitespace-nowrap">
-                판매 품목: 절임배추 20kg
-              </span>
-            </div>
-
-            {/* 20kg 메인 카드 */}
-            <div className="bg-emerald-50/70 border border-emerald-300 rounded-xl p-3 space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-base font-bold text-emerald-950 flex items-center gap-1.5">
-                    <span>{product20.name}</span>
-                    <span className="text-xs font-semibold bg-emerald-700 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
-                      기본 1박스
-                    </span>
-                  </div>
-                  <div className="text-sm font-bold text-emerald-800 mt-0.5">
-                    단가: <span className="stat-number">{formatPrice(product20.price)}</span>원 / 1박스
-                  </div>
+          {/* 상품 단위 및 수량 선택 (단일 배송 시 개별 수량/배송일, 다중 배송 시 합계 안내) */}
+          {isMultiDest ? (
+            <div className="bg-slate-900 text-white rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+              <div>
+                <div className="text-xs text-slate-300 font-semibold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span>다중 배송 총합 ({destinations.length}곳 분할 발송)</span>
                 </div>
-
-                {/* 수량 조절 버튼 */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setQty20kg((prev) => Math.max(1, prev - 1))}
-                    className="w-9 h-9 bg-white border border-emerald-400 rounded-lg text-lg font-bold flex items-center justify-center hover:bg-emerald-100 active:scale-95 cursor-pointer shadow-2xs shrink-0"
-                  >
-                    <Minus className="w-4 h-4 text-emerald-900" />
-                  </button>
-                  <span className="text-xl font-bold w-10 text-center stat-number text-emerald-950">
-                    {qty20kg}
+                <div className="text-sm font-bold text-emerald-400 mt-0.5">
+                  절임배추 20kg 총 {totalBoxes}박스 ({totalBoxes * 20}kg)
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-slate-300">총 합계 금액</div>
+                <div className="text-base font-black text-white">
+                  {formatPrice(totalAmount)}원
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* 상품 단위 및 수량 선택 (절임배추 20kg 단일 규격) */}
+              <div className="border-t border-b border-slate-200 py-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-slate-900">
+                    주문 상품 및 수량
+                  </h3>
+                  <span className="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md whitespace-nowrap">
+                    판매 품목: 절임배추 20kg
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setQty20kg((prev) => prev + 1)}
-                    className="w-9 h-9 bg-emerald-700 text-white rounded-lg text-lg font-bold flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer shadow-xs shrink-0"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                </div>
+
+                {/* 20kg 메인 카드 */}
+                <div className="bg-emerald-50/70 border border-emerald-300 rounded-xl p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-base font-bold text-emerald-950 flex items-center gap-1.5">
+                        <span>{product20.name}</span>
+                        <span className="text-xs font-semibold bg-emerald-700 text-white px-1.5 py-0.5 rounded whitespace-nowrap">
+                          기본 1박스
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold text-emerald-800 mt-0.5">
+                        단가: <span className="stat-number">{formatPrice(product20.price)}</span>원 / 1박스
+                      </div>
+                    </div>
+
+                    {/* 수량 조절 버튼 */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setQty20kg((prev) => Math.max(1, prev - 1))}
+                        className="w-9 h-9 bg-white border border-emerald-400 rounded-lg text-lg font-bold flex items-center justify-center hover:bg-emerald-100 active:scale-95 cursor-pointer shadow-2xs shrink-0"
+                      >
+                        <Minus className="w-4 h-4 text-emerald-900" />
+                      </button>
+                      <span className="text-xl font-bold w-10 text-center stat-number text-emerald-950">
+                        {qty20kg}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQty20kg((prev) => prev + 1)}
+                        className="w-9 h-9 bg-emerald-700 text-white rounded-lg text-lg font-bold flex items-center justify-center hover:bg-emerald-800 active:scale-95 cursor-pointer shadow-xs shrink-0"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 빠른 박스 수량 선택 버튼 모음 */}
+                  <div className="pt-2 border-t border-emerald-200 flex flex-wrap items-center gap-1.5">
+                    <span className="text-xs font-bold text-emerald-900 mr-0.5 whitespace-nowrap">빠른 선택:</span>
+                    {[1, 2, 3, 5, 10].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setQty20kg(num)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer transition-all whitespace-nowrap shrink-0 ${
+                          qty20kg === num
+                            ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
+                            : "bg-white text-emerald-900 border-emerald-300 hover:bg-emerald-100"
+                        }`}
+                      >
+                        {num}박스 ({num * 20}kg)
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* 빠른 박스 수량 선택 버튼 모음 */}
-              <div className="pt-2 border-t border-emerald-200 flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-bold text-emerald-900 mr-0.5 whitespace-nowrap">빠른 선택:</span>
-                {[1, 2, 3, 5, 10].map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setQty20kg(num)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border cursor-pointer transition-all whitespace-nowrap shrink-0 ${
-                      qty20kg === num
-                        ? "bg-emerald-800 text-white border-emerald-800 shadow-xs"
-                        : "bg-white text-emerald-900 border-emerald-300 hover:bg-emerald-100"
-                    }`}
-                  >
-                    {num}박스 ({num * 20}kg)
-                  </button>
-                ))}
+              {/* 택배 도착 희망일 (배추 받는 날) 선택 */}
+              <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 space-y-1.5">
+                <div>
+                  <label className="text-base font-bold text-slate-900 flex items-center gap-1">
+                    <span>택배 도착 희망일 (배추 받는 날)</span>
+                    <span className="text-red-600">*</span>
+                  </label>
+                </div>
+                <p className="text-xs text-slate-600">
+                  고객이 김치 담그기 전날 수령할 날짜를 선택합니다.
+                </p>
+                <input
+                  type="date"
+                  value={shippingDate}
+                  onChange={(e) => setShippingDate(e.target.value)}
+                  className="w-full text-base font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden bg-white"
+                  required
+                />
               </div>
-            </div>
-          </div>
-
-          {/* 택배 도착 희망일 (배추 받는 날) 선택 */}
-          <div className="bg-slate-50 border border-slate-300 rounded-xl p-3 space-y-1.5">
-            <div>
-              <label className="text-base font-bold text-slate-900 flex items-center gap-1">
-                <span>택배 도착 희망일 (배추 받는 날)</span>
-                <span className="text-red-600">*</span>
-              </label>
-            </div>
-            <p className="text-xs text-slate-600">
-              고객이 김치 담그기 전날 수령할 날짜를 선택합니다.
-            </p>
-            <input
-              type="date"
-              value={shippingDate}
-              onChange={(e) => setShippingDate(e.target.value)}
-              className="w-full text-base font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden bg-white"
-              required
-            />
-          </div>
+            </>
+          )}
 
           {/* 입금 상태 선택 */}
           <div>
