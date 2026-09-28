@@ -86,6 +86,7 @@ export interface CustomerAddress {
   alias: string;
   recipient_name: string;
   recipient_phone: string;
+  recipient_phone2?: string;
   zipcode?: string;
   address: string;
   address_detail?: string;
@@ -108,6 +109,7 @@ export async function fetchCustomerAddressesService(customerId: number): Promise
     alias: String(r.alias || "기본 자택"),
     recipient_name: String(r.recipient_name || ""),
     recipient_phone: String(r.recipient_phone || ""),
+    recipient_phone2: String(r.recipient_phone2 || ""),
     zipcode: String(r.zipcode || ""),
     address: String(r.address || ""),
     address_detail: String(r.address_detail || ""),
@@ -123,6 +125,7 @@ export async function addCustomerAddressService(data: {
   alias: string;
   recipient_name: string;
   recipient_phone: string;
+  recipient_phone2?: string;
   zipcode?: string;
   address: string;
   address_detail?: string;
@@ -141,13 +144,14 @@ export async function addCustomerAddressService(data: {
   }
 
   const res = await db.execute({
-    sql: `INSERT INTO customer_addresses (customer_id, alias, recipient_name, recipient_phone, zipcode, address, address_detail, delivery_memo, is_default, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO customer_addresses (customer_id, alias, recipient_name, recipient_phone, recipient_phone2, zipcode, address, address_detail, delivery_memo, is_default, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       data.customer_id,
       data.alias.trim() || "배송지",
       data.recipient_name.trim(),
       data.recipient_phone.trim(),
+      data.recipient_phone2?.trim() || "",
       data.zipcode?.trim() || "",
       data.address.trim(),
       data.address_detail?.trim() || "",
@@ -166,6 +170,7 @@ export async function updateCustomerAddressService(data: {
   alias?: string;
   recipient_name?: string;
   recipient_phone?: string;
+  recipient_phone2?: string;
   zipcode?: string;
   address?: string;
   address_detail?: string;
@@ -188,6 +193,7 @@ export async function updateCustomerAddressService(data: {
             alias = COALESCE(?, alias),
             recipient_name = COALESCE(?, recipient_name),
             recipient_phone = COALESCE(?, recipient_phone),
+            recipient_phone2 = COALESCE(?, recipient_phone2),
             zipcode = COALESCE(?, zipcode),
             address = COALESCE(?, address),
             address_detail = COALESCE(?, address_detail),
@@ -199,6 +205,7 @@ export async function updateCustomerAddressService(data: {
       data.alias !== undefined ? data.alias.trim() : null,
       data.recipient_name !== undefined ? data.recipient_name.trim() : null,
       data.recipient_phone !== undefined ? data.recipient_phone.trim() : null,
+      data.recipient_phone2 !== undefined ? data.recipient_phone2.trim() : null,
       data.zipcode !== undefined ? data.zipcode.trim() : null,
       data.address !== undefined ? data.address.trim() : null,
       data.address_detail !== undefined ? data.address_detail.trim() : null,
@@ -499,8 +506,11 @@ export async function fetchDashboardService(dateStr: string) {
 }
 
 export async function createOrderService(data: {
+  customer_id?: number;
   name: string;
   phone: string;
+  recipient_name?: string;
+  recipient_phone?: string;
   zipcode?: string;
   address: string;
   address_detail?: string;
@@ -526,7 +536,10 @@ export async function createOrderService(data: {
 
   // 1. 고객 확인 및 등록
   let customerId: number;
-  if (cleanPhone) {
+  if (data.customer_id) {
+    // 기존 고객 ID가 명시적으로 지정된 경우: 해당 고객 ID 유지 (주문 고객 정보 보호)
+    customerId = Number(data.customer_id);
+  } else if (cleanPhone) {
     const existingCustomer = await db.execute({
       sql: "SELECT id FROM customers WHERE REPLACE(phone, '-', '') = ? LIMIT 1",
       args: [cleanPhone],
@@ -534,13 +547,6 @@ export async function createOrderService(data: {
 
     if (existingCustomer.rows.length > 0) {
       customerId = Number(existingCustomer.rows[0].id);
-      await db.execute({
-        sql: `UPDATE customers SET 
-                name = ?, address = COALESCE(?, address), 
-                address_detail = COALESCE(?, address_detail), 
-                updated_at = ? WHERE id = ?`,
-        args: [data.name, data.address || "", data.address_detail || "", now, customerId],
-      });
     } else {
       const custCode = await generateCustomerCode(db, data.name);
       const newCustomer = await db.execute({
@@ -565,12 +571,6 @@ export async function createOrderService(data: {
     });
     if (existingCustomer.rows.length > 0) {
       customerId = Number(existingCustomer.rows[0].id);
-      if (data.address) {
-        await db.execute({
-          sql: `UPDATE customers SET address = ?, updated_at = ? WHERE id = ?`,
-          args: [data.address, now, customerId],
-        });
-      }
     } else {
       const custCode = await generateCustomerCode(db, data.name);
       const newCustomer = await db.execute({
@@ -606,27 +606,33 @@ export async function createOrderService(data: {
   const orderType = data.order_type || "NORMAL";
   const eventName = orderType === "EVENT" ? (data.event_name?.trim() || "임실 김치 축제") : null;
 
-  // 3. 주문 등록
+  // 3. 주문 등록 (주문 고객과 수령인 정보 분리 저장)
+  const finalRecipientName = (data.recipient_name || data.name).trim();
+  const finalRecipientPhone = (data.recipient_phone || data.phone).trim();
+
   const orderResult = await db.execute({
     sql: `INSERT INTO orders (
             order_no, customer_id, customer_name, customer_phone,
+            recipient_name, recipient_phone,
             shipping_address, shipping_address_detail, order_date,
             shipping_date, total_amount, paid_amount, payment_status,
             order_status, memo, order_type, event_name, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?, ?, ?, ?)`,
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'RECEIVED', ?, ?, ?, ?, ?)`,
     args: [
       orderNo,
       customerId,
-      data.name,
-      data.phone,
-      data.address,
-      data.address_detail || "",
+      data.name.trim(),
+      data.phone.trim(),
+      finalRecipientName,
+      finalRecipientPhone,
+      data.address.trim(),
+      data.address_detail ? data.address_detail.trim() : "",
       format(new Date(), "yyyy-MM-dd"),
       data.shipping_date,
       totalAmount,
       paidAmount,
       data.payment_status,
-      data.memo || "",
+      data.memo ? data.memo.trim() : "",
       orderType,
       eventName,
       now,
@@ -817,6 +823,8 @@ export interface UpdateOrderPayload {
   orderId: number;
   customerName: string;
   customerPhone: string;
+  recipientName?: string;
+  recipientPhone?: string;
   shippingDate: string;
   shippingAddress: string;
   shippingAddressDetail?: string;
@@ -846,11 +854,16 @@ export async function updateOrderDetailService(data: UpdateOrderPayload) {
   const orderType = data.orderType || "NORMAL";
   const eventName = orderType === "EVENT" ? (data.eventName?.trim() || "임실 김치 축제") : null;
 
+  const finalRecipientName = data.recipientName ? data.recipientName.trim() : null;
+  const finalRecipientPhone = data.recipientPhone ? data.recipientPhone.trim() : null;
+
   // 1. orders 업데이트
   await db.execute({
     sql: `UPDATE orders SET 
             customer_name = ?,
             customer_phone = ?,
+            recipient_name = COALESCE(?, recipient_name, ?),
+            recipient_phone = COALESCE(?, recipient_phone, ?),
             shipping_address = ?,
             shipping_address_detail = ?,
             shipping_date = ?,
@@ -864,6 +877,10 @@ export async function updateOrderDetailService(data: UpdateOrderPayload) {
           WHERE id = ?`,
     args: [
       data.customerName,
+      data.customerPhone,
+      finalRecipientName,
+      data.customerName,
+      finalRecipientPhone,
       data.customerPhone,
       data.shippingAddress,
       data.shippingAddressDetail || "",
@@ -999,7 +1016,7 @@ export async function fetchCustomersService(query: string = "") {
 
   let sql = `
     SELECT 
-      c.id, c.customer_code, c.name, c.phone, c.zipcode, c.address, c.address_detail, c.memo,
+      c.id, c.customer_code, c.name, c.phone, c.phone2, c.zipcode, c.address, c.address_detail, c.memo,
       COUNT(DISTINCT o.id) as order_count,
       COALESCE(SUM(o.total_amount), 0) as total_spent,
       MAX(o.shipping_date) as last_order_date,
@@ -1016,15 +1033,26 @@ export async function fetchCustomersService(query: string = "") {
     sql += ` WHERE (
       c.name LIKE ? 
       OR REPLACE(c.phone, '-', '') LIKE ? 
+      OR REPLACE(COALESCE(c.phone2, ''), '-', '') LIKE ?
       OR c.customer_code LIKE ?
       OR c.id IN (
         SELECT customer_id FROM customer_addresses 
         WHERE REPLACE(recipient_phone, '-', '') LIKE ? 
+           OR REPLACE(COALESCE(recipient_phone2, ''), '-', '') LIKE ?
            OR recipient_name LIKE ? 
            OR address LIKE ?
       )
     )`;
-    args.push(`%${query.trim()}%`, `%${cleanQ}%`, `%${query.trim()}%`, `%${cleanQ}%`, `%${query.trim()}%`, `%${query.trim()}%`);
+    args.push(
+      `%${query.trim()}%`,
+      `%${cleanQ}%`,
+      `%${cleanQ}%`,
+      `%${query.trim()}%`,
+      `%${cleanQ}%`,
+      `%${cleanQ}%`,
+      `%${query.trim()}%`,
+      `%${query.trim()}%`
+    );
   }
 
   sql += " GROUP BY c.id ORDER BY CAST(COALESCE(c.customer_code, '999999') AS INTEGER) ASC, c.id DESC LIMIT 100";
@@ -1397,23 +1425,34 @@ export async function updateCustomerService(data: {
   customer_code?: string;
   name: string;
   phone: string;
+  phone2?: string;
   address?: string;
   address_detail?: string;
   memo?: string;
 }) {
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const now = new Date().toISOString();
   await db.execute({
     sql: `UPDATE customers SET 
             customer_code = COALESCE(?, customer_code),
-            name=?, phone=?, address=?, address_detail=?, memo=? WHERE id=?`,
+            name = ?, 
+            phone = ?, 
+            phone2 = ?, 
+            address = ?, 
+            address_detail = ?, 
+            memo = ?,
+            updated_at = ?
+          WHERE id = ?`,
     args: [
       data.customer_code ? data.customer_code.trim().toUpperCase() : null,
-      data.name,
-      data.phone,
-      data.address || "",
-      data.address_detail || "",
-      data.memo || "",
+      data.name.trim(),
+      data.phone.trim(),
+      data.phone2 ? data.phone2.trim() : "",
+      data.address ? data.address.trim() : "",
+      data.address_detail ? data.address_detail.trim() : "",
+      data.memo ? data.memo.trim() : "",
+      now,
       data.id,
     ],
   });

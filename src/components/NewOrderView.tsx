@@ -80,12 +80,17 @@ export function NewOrderView({
   const [showPostOrderPrompt, setShowPostOrderPrompt] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
-  // 다중 배송지 상태 관리
+  // 다중 배송지 및 주문자/수령인 분리 상태 관리
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [customerAddresses, setCustomerAddresses] = useState<CustomerAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null);
   const [saveAsNewAddress, setSaveAsNewAddress] = useState(false);
   const [newAddressLabel, setNewAddressLabel] = useState("");
+  // 받는 분이 주문자와 다를 경우를 위한 별도 수령인 정보
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [recipientPhone2, setRecipientPhone2] = useState("");
+  const [differentRecipient, setDifferentRecipient] = useState(false);
 
   // 모바일 뒤로가기 버튼 시 주문 완료 안내 팝업 닫기
   useBackButtonModal(
@@ -151,19 +156,31 @@ export function NewOrderView({
 
   const applyAddress = (addr: CustomerAddress) => {
     setSelectedAddressId(addr.id);
-    setName(addr.recipient_name || selectedCustomer?.name || "");
-    setPhone(addr.recipient_phone || selectedCustomer?.phone || "");
+    // 주문 고객은 그대로 유지하고 받는 사람/배송지만 변경
+    setRecipientName(addr.recipient_name || "");
+    setRecipientPhone(addr.recipient_phone || "");
+    setRecipientPhone2(addr.recipient_phone2 || "");
     setAddress(addr.address || "");
     setAddressDetail(addr.address_detail || "");
     setSaveAsNewAddress(false);
+    // 수령인이 주문 고객과 다르면 differentRecipient를 true로 설정
+    if (addr.recipient_name && addr.recipient_name !== (selectedCustomer?.name || name)) {
+      setDifferentRecipient(true);
+    } else {
+      setDifferentRecipient(false);
+    }
   };
 
   const selectExistingCustomer = async (cust: any) => {
     setSelectedCustomer(cust);
     setName(cust.name || "");
     setPhone(cust.phone || "");
+    setRecipientName(cust.name || "");
+    setRecipientPhone(cust.phone || "");
+    setRecipientPhone2(cust.phone2 || "");
     setAddress(cust.address || "");
     setAddressDetail(cust.address_detail || "");
+    setDifferentRecipient(false);
     setCustomerSuggestions([]);
     setSaveAsNewAddress(false);
     setNewAddressLabel("");
@@ -356,6 +373,9 @@ export function NewOrderView({
 
     const finalAddress = address.trim() || (isEvent ? "행사 현장 납품 (택배 없음)" : "");
 
+    const effectiveRecipientName = (differentRecipient && recipientName.trim()) ? recipientName.trim() : name.trim();
+    const effectiveRecipientPhone = (differentRecipient && recipientPhone.trim()) ? recipientPhone.trim() : phone.trim();
+
     setIsSubmitting(true);
     try {
       let createdOrderNo = "";
@@ -378,8 +398,11 @@ export function NewOrderView({
       } else {
         // 직접 수기 입력된 경우
         const ordRes = await createOrderService({
+          customer_id: selectedCustomer?.id ? Number(selectedCustomer.id) : undefined,
           name: name.trim(),
           phone: phone.trim(),
+          recipient_name: effectiveRecipientName,
+          recipient_phone: effectiveRecipientPhone,
           address: finalAddress,
           address_detail: addressDetail.trim(),
           shipping_date: shippingDate,
@@ -398,8 +421,9 @@ export function NewOrderView({
           await addCustomerAddressService({
             customer_id: Number(selectedCustomer.id),
             alias: newAddressLabel.trim() || "추가 배송지",
-            recipient_name: name.trim(),
-            recipient_phone: phone.trim(),
+            recipient_name: effectiveRecipientName,
+            recipient_phone: effectiveRecipientPhone,
+            recipient_phone2: recipientPhone2.trim() || undefined,
             address: address.trim(),
             address_detail: addressDetail.trim() || undefined,
             delivery_memo: memo.trim() || undefined,
@@ -796,17 +820,70 @@ export function NewOrderView({
 
                 <div>
                   <label className="block text-base font-bold text-slate-900 mb-1">
-                    고객 이름 (받는 분) <span className="text-red-600">*</span>
+                    주문 고객명 <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="예: 홍길동"
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (!differentRecipient) setRecipientName(e.target.value);
+                    }}
+                    placeholder="예: 홍길동 (주문하시는 분)"
                     className="w-full text-sm font-bold border border-slate-300 rounded-xl px-3 py-2 focus:border-emerald-600 focus:outline-hidden bg-white"
                     required
                   />
                 </div>
+              </div>
+
+              {/* 주문 고객과 받는 분이 다른 경우 (예: 자녀, 친척에게 보내는 경우) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={differentRecipient}
+                    onChange={(e) => {
+                      setDifferentRecipient(e.target.checked);
+                      if (!e.target.checked) {
+                        setRecipientName(name);
+                        setRecipientPhone(phone);
+                      }
+                    }}
+                    className="rounded border-slate-300 text-emerald-700 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                  />
+                  <span>받는 분(수령인)이 주문 고객과 다릅니다 (가족·선물 발송)</span>
+                </label>
+
+                {differentRecipient && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200 animate-in fade-in duration-100">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        받는 분 성함 <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={recipientName}
+                        onChange={(e) => setRecipientName(e.target.value)}
+                        placeholder="예: 김딸, 박아들"
+                        className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
+                        required={differentRecipient}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-800 mb-1">
+                        받는 분 연락처 <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        value={recipientPhone}
+                        onChange={(e) => setRecipientPhone(formatPhone(e.target.value))}
+                        placeholder="예: 010-9876-5432"
+                        className="w-full text-sm font-bold border border-slate-300 rounded-lg px-3 py-1.5 focus:border-emerald-600 focus:outline-hidden bg-white"
+                        required={differentRecipient}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 다중 배송지 선택 인터페이스 (기존 고객 선택 시) */}

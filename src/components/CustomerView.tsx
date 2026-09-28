@@ -16,13 +16,16 @@ import {
   Trash2,
   Bookmark,
   Search,
+  Edit3,
 } from "lucide-react";
 import {
   fetchCustomersService,
   fetchCustomerDetailService,
   createCustomerService,
+  updateCustomerService,
   batchCreateCustomersService,
   addCustomerAddressService,
+  updateCustomerAddressService,
   deleteCustomerAddressService,
   CustomerAddress,
 } from "@/lib/services";
@@ -57,15 +60,29 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
   const [manualAddModal, setManualAddModal] = useState(false);
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
+  const [manualPhone2, setManualPhone2] = useState("");
   const [manualAddress, setManualAddress] = useState("");
   const [manualAddressDetail, setManualAddressDetail] = useState("");
   const [manualMemo, setManualMemo] = useState("");
 
-  // 새 배송지(수령인) 추가 모달 상태
+  // 고객 정보 수정 모달 상태
+  const [editCustomerModal, setEditCustomerModal] = useState(false);
+  const [editCustomerCode, setEditCustomerCode] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editPhone2, setEditPhone2] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editAddressDetail, setEditAddressDetail] = useState("");
+  const [editMemo, setEditMemo] = useState("");
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+
+  // 배송지(수령인) 추가/수정 모달 상태
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
   const [addressAlias, setAddressAlias] = useState("서울 딸네");
   const [addressRecipientName, setAddressRecipientName] = useState("");
   const [addressRecipientPhone, setAddressRecipientPhone] = useState("");
+  const [addressRecipientPhone2, setAddressRecipientPhone2] = useState("");
   const [addressLine, setAddressLine] = useState("");
   const [addressDetailLine, setAddressDetailLine] = useState("");
   const [addressMemo, setAddressMemo] = useState("");
@@ -99,23 +116,25 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
   // 모바일 뒤로가기 버튼 처리
   useEffect(() => {
     const handlePopState = () => {
-      if (importContactsModal || manualAddModal || unsupportedModal || showAddressModal) {
+      if (importContactsModal || manualAddModal || unsupportedModal || showAddressModal || editCustomerModal) {
         setImportContactsModal(false);
         setManualAddModal(false);
         setUnsupportedModal(false);
         setShowAddressModal(false);
+        setEditCustomerModal(false);
       }
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [importContactsModal, manualAddModal, unsupportedModal, showAddressModal]);
+  }, [importContactsModal, manualAddModal, unsupportedModal, showAddressModal, editCustomerModal]);
 
-  const openModalSafely = (type: "import" | "manual" | "unsupported" | "address") => {
+  const openModalSafely = (type: "import" | "manual" | "unsupported" | "address" | "edit-customer") => {
     window.history.pushState({ modal: `customer-${type}` }, "");
     if (type === "import") setImportContactsModal(true);
     if (type === "manual") setManualAddModal(true);
     if (type === "unsupported") setUnsupportedModal(true);
     if (type === "address") setShowAddressModal(true);
+    if (type === "edit-customer") setEditCustomerModal(true);
   };
 
   const closeModalSafely = () => {
@@ -126,6 +145,7 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
       setManualAddModal(false);
       setUnsupportedModal(false);
       setShowAddressModal(false);
+      setEditCustomerModal(false);
     }
   };
 
@@ -252,6 +272,7 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
       await createCustomerService({
         name: manualName.trim(),
         phone: formatKoreanPhone(manualPhone.trim()),
+        phone2: manualPhone2.trim() ? formatKoreanPhone(manualPhone2.trim()) : undefined,
         address: manualAddress.trim(),
         address_detail: manualAddressDetail.trim(),
         memo: manualMemo.trim(),
@@ -260,6 +281,7 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
       alert("고객 정보가 성공적으로 저장되었습니다.");
       setManualName("");
       setManualPhone("");
+      setManualPhone2("");
       setManualAddress("");
       setManualAddressDetail("");
       setManualMemo("");
@@ -273,7 +295,81 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
     }
   };
 
-  // 새 배송지(수령인) 추가 저장
+  // 고객 정보 수정 열기
+  const handleOpenEditCustomer = () => {
+    if (!customerDetail?.customer) return;
+    const c = customerDetail.customer;
+    setEditCustomerCode(c.customer_code || "");
+    setEditName(c.name || "");
+    setEditPhone(c.phone || "");
+    setEditPhone2(c.phone2 || "");
+    setEditAddress(c.address || "");
+    setEditAddressDetail(c.address_detail || "");
+    setEditMemo(c.memo || "");
+    openModalSafely("edit-customer");
+  };
+
+  // 고객 정보 수정 저장
+  const handleSaveEditCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomerId) return;
+    if (!editName.trim() || !editPhone.trim()) {
+      alert("고객 이름과 연락처는 필수입니다.");
+      return;
+    }
+
+    setIsSavingCustomer(true);
+    try {
+      await updateCustomerService({
+        id: selectedCustomerId,
+        customer_code: editCustomerCode.trim() || undefined,
+        name: editName.trim(),
+        phone: formatKoreanPhone(editPhone.trim()),
+        phone2: editPhone2.trim() ? formatKoreanPhone(editPhone2.trim()) : undefined,
+        address: editAddress.trim(),
+        address_detail: editAddressDetail.trim(),
+        memo: editMemo.trim(),
+      });
+
+      alert("고객 정보가 성공적으로 수정되었습니다.");
+      closeModalSafely();
+      await loadCustomerDetail(selectedCustomerId);
+      await fetchCustomers(query);
+    } catch (err: any) {
+      console.error(err);
+      alert("고객 정보 수정 실패: " + err.message);
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  // 신규 배송지 등록 모달 열기
+  const handleOpenAddAddress = () => {
+    setEditingAddressId(null);
+    setAddressAlias("서울 딸네");
+    setAddressRecipientName("");
+    setAddressRecipientPhone("");
+    setAddressRecipientPhone2("");
+    setAddressLine("");
+    setAddressDetailLine("");
+    setAddressMemo("");
+    openModalSafely("address");
+  };
+
+  // 배송지 수정 모달 열기
+  const handleOpenEditAddress = (addr: CustomerAddress) => {
+    setEditingAddressId(addr.id);
+    setAddressAlias(addr.alias || "배송지");
+    setAddressRecipientName(addr.recipient_name || "");
+    setAddressRecipientPhone(addr.recipient_phone || "");
+    setAddressRecipientPhone2(addr.recipient_phone2 || "");
+    setAddressLine(addr.address || "");
+    setAddressDetailLine(addr.address_detail || "");
+    setAddressMemo(addr.delivery_memo || "");
+    openModalSafely("address");
+  };
+
+  // 배송지(수령인) 추가 또는 수정 저장
   const handleSaveNewAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomerId) return;
@@ -284,28 +380,41 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
 
     setIsAddingAddress(true);
     try {
-      await addCustomerAddressService({
-        customer_id: selectedCustomerId,
-        alias: addressAlias.trim() || "배송지",
-        recipient_name: addressRecipientName.trim(),
-        recipient_phone: addressRecipientPhone.trim() || customerDetail?.customer?.phone || "",
-        address: addressLine.trim(),
-        address_detail: addressDetailLine.trim(),
-        delivery_memo: addressMemo.trim(),
-      });
+      if (editingAddressId) {
+        // 수정
+        await updateCustomerAddressService({
+          id: editingAddressId,
+          customer_id: selectedCustomerId,
+          alias: addressAlias.trim() || "배송지",
+          recipient_name: addressRecipientName.trim(),
+          recipient_phone: addressRecipientPhone.trim() ? formatKoreanPhone(addressRecipientPhone.trim()) : "",
+          recipient_phone2: addressRecipientPhone2.trim() ? formatKoreanPhone(addressRecipientPhone2.trim()) : "",
+          address: addressLine.trim(),
+          address_detail: addressDetailLine.trim(),
+          delivery_memo: addressMemo.trim(),
+        });
+        alert("배송지가 성공적으로 수정되었습니다.");
+      } else {
+        // 신규 추가
+        await addCustomerAddressService({
+          customer_id: selectedCustomerId,
+          alias: addressAlias.trim() || "배송지",
+          recipient_name: addressRecipientName.trim(),
+          recipient_phone: addressRecipientPhone.trim() ? formatKoreanPhone(addressRecipientPhone.trim()) : (customerDetail?.customer?.phone || ""),
+          recipient_phone2: addressRecipientPhone2.trim() ? formatKoreanPhone(addressRecipientPhone2.trim()) : undefined,
+          address: addressLine.trim(),
+          address_detail: addressDetailLine.trim(),
+          delivery_memo: addressMemo.trim(),
+        });
+        alert("배송지가 성공적으로 추가되었습니다.");
+      }
 
-      alert("배송지가 성공적으로 추가되었습니다.");
-      setAddressAlias("서울 딸네");
-      setAddressRecipientName("");
-      setAddressRecipientPhone("");
-      setAddressLine("");
-      setAddressDetailLine("");
-      setAddressMemo("");
+      setEditingAddressId(null);
       closeModalSafely();
       await loadCustomerDetail(selectedCustomerId);
       await fetchCustomers(query);
     } catch (err: any) {
-      alert("배송지 추가 실패: " + err.message);
+      alert("배송지 저장 실패: " + err.message);
     } finally {
       setIsAddingAddress(false);
     }
@@ -571,13 +680,36 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                     <span>{customerDetail.customer.name} 님</span>
                     {getCustomerGradeBadge(customerDetail.customer)}
                   </div>
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-800">
-                    #{customerDetail.customer.customer_code}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-200 text-slate-800">
+                      #{customerDetail.customer.customer_code}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenEditCustomer}
+                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-emerald-800 bg-white hover:bg-slate-100 border border-slate-300 px-2 py-0.5 rounded cursor-pointer whitespace-nowrap"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                      <span>정보수정</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="text-sm font-bold text-slate-800">
-                  연락처: {customerDetail.customer.phone}
+                <div className="space-y-1">
+                  <div className="text-sm font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                    <span>연락처1(대표): {customerDetail.customer.phone}</span>
+                    {customerDetail.customer.phone2 && (
+                      <span className="text-xs bg-slate-200 text-slate-800 font-bold px-1.5 py-0.5 rounded">
+                        연락처2: {customerDetail.customer.phone2}
+                      </span>
+                    )}
+                  </div>
+                  {customerDetail.customer.address && (
+                    <div className="text-xs text-slate-600 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{customerDetail.customer.address} {customerDetail.customer.address_detail || ""}</span>
+                    </div>
+                  )}
                 </div>
 
                 {customerDetail.customer.memo && (
@@ -596,7 +728,7 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                   </div>
                   <button
                     type="button"
-                    onClick={() => openModalSafely("address")}
+                    onClick={handleOpenAddAddress}
                     className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-1 rounded cursor-pointer whitespace-nowrap"
                   >
                     + 배송지 추가
@@ -618,21 +750,42 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                           <span className="font-bold text-emerald-900 bg-emerald-100 px-1.5 py-0.5 rounded">
                             [{addr.alias || "배송지"}]
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteAddress(addr.id, addr.alias)}
-                            className="text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
-                            title="배송지 삭제"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditAddress(addr)}
+                              className="text-slate-500 hover:text-emerald-800 cursor-pointer p-0.5 text-xs font-bold flex items-center gap-0.5"
+                              title="배송지 수정"
+                            >
+                              <Edit3 className="w-3 h-3" />
+                              <span>수정</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAddress(addr.id, addr.alias)}
+                              className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5"
+                              title="배송지 삭제"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="font-bold text-slate-800">
-                          수령인: {addr.recipient_name} ({addr.recipient_phone})
+                        <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                          <span>수령인: {addr.recipient_name} ({addr.recipient_phone})</span>
+                          {addr.recipient_phone2 && (
+                            <span className="text-[11px] bg-slate-200 text-slate-700 px-1 rounded">
+                              추가: {addr.recipient_phone2}
+                            </span>
+                          )}
                         </div>
                         <div className="text-slate-600">
                           {addr.address} {addr.address_detail || ""}
                         </div>
+                        {addr.delivery_memo && (
+                          <div className="text-[11px] text-slate-500">
+                            [요청] {addr.delivery_memo}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -799,18 +952,32 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-800 mb-1">
-                  전화번호 <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="tel"
-                  value={manualPhone}
-                  onChange={(e) => setManualPhone(e.target.value)}
-                  placeholder="예: 010-1234-5678"
-                  className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    대표 연락처 <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={manualPhone}
+                    onChange={(e) => setManualPhone(e.target.value)}
+                    placeholder="예: 010-1234-5678"
+                    className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    추가 연락처 (집/가족)
+                  </label>
+                  <input
+                    type="tel"
+                    value={manualPhone2}
+                    onChange={(e) => setManualPhone2(e.target.value)}
+                    placeholder="예: 063-640-0000"
+                    className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
               </div>
 
               <div>
@@ -873,13 +1040,13 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
         </div>
       )}
 
-      {/* 모달 3: 배송지(수령인) 추가 모달 */}
+      {/* 모달 3: 배송지(수령인) 추가/수정 모달 */}
       {showAddressModal && selectedCustomerId && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-md w-full shadow-xl border-2 border-slate-300 flex flex-col max-h-[90vh]">
             <div className="bg-slate-900 text-white p-4 rounded-t-xl flex items-center justify-between">
               <h3 className="text-base font-bold">
-                {customerDetail?.customer?.name} 님의 추가 배송지 등록
+                {customerDetail?.customer?.name} 님의 {editingAddressId ? "배송지 정보 수정" : "추가 배송지 등록"}
               </h3>
               <button
                 type="button"
@@ -921,29 +1088,41 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  받는 분 성함 <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={addressRecipientName}
+                  onChange={(e) => setAddressRecipientName(e.target.value)}
+                  placeholder="수령인 성함 (예: 김딸, 박아들)"
+                  className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  required
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs font-bold text-slate-800 mb-1">
-                    받는 분 성함 <span className="text-red-600">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={addressRecipientName}
-                    onChange={(e) => setAddressRecipientName(e.target.value)}
-                    placeholder="수령인 성함"
-                    className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-800 mb-1">
-                    받는 분 연락처
+                    받는 분 연락처 1
                   </label>
                   <input
                     type="tel"
                     value={addressRecipientPhone}
                     onChange={(e) => setAddressRecipientPhone(e.target.value)}
+                    placeholder="010-0000-0000"
+                    className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    받는 분 연락처 2 (선택)
+                  </label>
+                  <input
+                    type="tel"
+                    value={addressRecipientPhone2}
+                    onChange={(e) => setAddressRecipientPhone2(e.target.value)}
                     placeholder="010-0000-0000"
                     className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
                   />
@@ -1004,6 +1183,140 @@ export function CustomerView({ onRequestConfig }: CustomerViewProps) {
                   className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold cursor-pointer"
                 >
                   {isAddingAddress ? "저장 중..." : "배송지 저장하기"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 고객 정보 수정 모달 */}
+      {editCustomerModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-xl border-2 border-slate-300 flex flex-col max-h-[90vh]">
+            <div className="bg-slate-900 text-white p-4 rounded-t-xl flex items-center justify-between">
+              <h3 className="text-base font-bold">
+                고객 정보 수정 (#{editCustomerCode})
+              </h3>
+              <button
+                type="button"
+                onClick={closeModalSafely}
+                className="text-white hover:bg-slate-800 p-1 rounded cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCustomer} className="p-4 space-y-3 overflow-y-auto flex-1 text-sm">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    고객 성함 <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="고객 성함"
+                    className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    고객 코드
+                  </label>
+                  <input
+                    type="text"
+                    value={editCustomerCode}
+                    onChange={(e) => setEditCustomerCode(e.target.value)}
+                    placeholder="예: 10001"
+                    className="w-full font-mono font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    대표 연락처 <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    placeholder="010-0000-0000"
+                    className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1">
+                    추가 연락처 (집/가족)
+                  </label>
+                  <input
+                    type="tel"
+                    value={editPhone2}
+                    onChange={(e) => setEditPhone2(e.target.value)}
+                    placeholder="010-0000-0000"
+                    className="w-full font-bold border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  기본 배송 주소
+                </label>
+                <input
+                  type="text"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  placeholder="도로명 또는 지번 주소"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  상세 주소
+                </label>
+                <input
+                  type="text"
+                  value={editAddressDetail}
+                  onChange={(e) => setEditAddressDetail(e.target.value)}
+                  placeholder="동/호수 등 상세 주소"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  특이사항 및 메모
+                </label>
+                <input
+                  type="text"
+                  value={editMemo}
+                  onChange={(e) => setEditMemo(e.target.value)}
+                  placeholder="고객 특이사항 메모"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:border-emerald-600 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={closeModalSafely}
+                  className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingCustomer}
+                  className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold cursor-pointer"
+                >
+                  {isSavingCustomer ? "저장 중..." : "수정 완료"}
                 </button>
               </div>
             </form>
