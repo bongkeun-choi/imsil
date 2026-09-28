@@ -34,6 +34,7 @@ import {
   addCustomerAddressService,
   updateCustomerAddressService,
   deleteCustomerAddressService,
+  deleteCustomerService,
   CustomerAddress,
 } from "@/lib/services";
 import {
@@ -55,6 +56,10 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
   const [loading, setLoading] = useState(true);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
   const [customerDetail, setCustomerDetail] = useState<any>(null);
+
+  // 고객 상세 정보 팝업 모달 상태
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [isInlineEditing, setIsInlineEditing] = useState(false);
 
   // 연락처 가져오기 모달 상태
   const [importContactsModal, setImportContactsModal] = useState(false);
@@ -124,20 +129,23 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
   // 모바일 뒤로가기 버튼 처리
   useEffect(() => {
     const handlePopState = () => {
-      if (importContactsModal || manualAddModal || unsupportedModal || showAddressModal || editCustomerModal) {
+      if (showDetailModal || importContactsModal || manualAddModal || unsupportedModal || showAddressModal || editCustomerModal) {
+        setShowDetailModal(false);
         setImportContactsModal(false);
         setManualAddModal(false);
         setUnsupportedModal(false);
         setShowAddressModal(false);
         setEditCustomerModal(false);
+        setIsInlineEditing(false);
       }
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [importContactsModal, manualAddModal, unsupportedModal, showAddressModal, editCustomerModal]);
+  }, [showDetailModal, importContactsModal, manualAddModal, unsupportedModal, showAddressModal, editCustomerModal]);
 
-  const openModalSafely = (type: "import" | "manual" | "unsupported" | "address" | "edit-customer") => {
+  const openModalSafely = (type: "detail" | "import" | "manual" | "unsupported" | "address" | "edit-customer") => {
     window.history.pushState({ modal: `customer-${type}` }, "");
+    if (type === "detail") setShowDetailModal(true);
     if (type === "import") setImportContactsModal(true);
     if (type === "manual") setManualAddModal(true);
     if (type === "unsupported") setUnsupportedModal(true);
@@ -149,11 +157,13 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
     if (window.location.hash || window.history.state?.modal) {
       window.history.back();
     } else {
+      setShowDetailModal(false);
       setImportContactsModal(false);
       setManualAddModal(false);
       setUnsupportedModal(false);
       setShowAddressModal(false);
       setEditCustomerModal(false);
+      setIsInlineEditing(false);
     }
   };
 
@@ -169,6 +179,37 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
       setCustomerDetail(res);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleOpenDetail = async (id: number) => {
+    setSelectedCustomerId(id);
+    setIsInlineEditing(false);
+    openModalSafely("detail");
+    try {
+      const res = await fetchCustomerDetailService(id);
+      setCustomerDetail(res);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteCustomer = async () => {
+    if (!customerDetail?.customer?.id) return;
+    const cid = customerDetail.customer.id;
+    const cname = customerDetail.customer.name;
+    if (!confirm(`[${cname}] 고객을 정말 삭제하시겠습니까?\n등록된 주소록 정보도 함께 삭제됩니다.`)) {
+      return;
+    }
+    try {
+      await deleteCustomerService(cid);
+      alert(`[${cname}] 고객이 삭제되었습니다.`);
+      closeModalSafely();
+      setCustomerDetail(null);
+      setSelectedCustomerId(null);
+      fetchCustomers(query);
+    } catch (err: any) {
+      alert(err.message || "고객 삭제 실패");
     }
   };
 
@@ -542,10 +583,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
         </div>
       </div>
 
-      {/* 2열 메인 그리드: 고객 목록 & 우측 상세 정보 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* 등록된 단골 고객 목록 */}
-        <div className="md:col-span-2 bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs space-y-3">
+      {/* 전면 고객 목록 화면 */}
+      <div className="bg-white rounded-2xl border-2 border-slate-300 p-4 md:p-5 shadow-xs space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
             <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
               <span>고객 목록 ({filteredCustomers.length}명)</span>
@@ -601,10 +640,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
               {filteredCustomers.map((c) => (
                 <div
                   key={c.id}
-                  onClick={() => loadCustomerDetail(c.id)}
-                  className={`py-3.5 px-3 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors ${
-                    selectedCustomerId === c.id ? "bg-emerald-50 border-2 border-emerald-500" : ""
-                  }`}
+                  onClick={() => handleOpenDetail(c.id)}
+                  className="py-3 px-3 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-200"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -626,37 +663,30 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          loadCustomerDetail(c.id);
-                          setEditCustomerCode(c.customer_code || "");
-                          setEditName(c.name || "");
-                          setEditPhone(c.phone || "");
-                          setEditPhone2(c.phone2 || "");
-                          setEditAddress(c.address || "");
-                          setEditAddressDetail(c.address_detail || "");
-                          setEditMemo(c.memo || "");
-                          openModalSafely("edit-customer");
+                          handleOpenDetail(c.id);
                         }}
-                        className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 px-2 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer"
-                        title="고객 정보 수정"
+                        className="inline-flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0 cursor-pointer shadow-2xs"
                       >
-                        <Edit3 className="w-3.5 h-3.5 text-slate-600" />
-                        <span>수정</span>
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>상세보기 & 관리</span>
                       </button>
                       <a
                         href={`tel:${c.phone.replace(/[^0-9]/g, "")}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0"
+                        className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0"
+                        title="전화 걸기"
                       >
-                        <Phone className="w-3.5 h-3.5" />
-                        <span>전화</span>
+                        <Phone className="w-3.5 h-3.5 text-emerald-700" />
+                        <span className="hidden sm:inline">전화</span>
                       </a>
                       <a
                         href={`sms:${c.phone.replace(/[^0-9]/g, "")}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1 bg-slate-800 hover:bg-slate-900 text-white px-2.5 py-1 rounded text-xs font-bold whitespace-nowrap shrink-0"
+                        className="inline-flex items-center gap-1 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 px-2 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shrink-0"
+                        title="문자 보내기"
                       >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>문자</span>
+                        <MessageSquare className="w-3.5 h-3.5 text-slate-600" />
+                        <span className="hidden sm:inline">문자</span>
                       </a>
                     </div>
                   </div>
@@ -681,8 +711,8 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                   <div className="flex items-center gap-3 text-xs text-slate-500 font-medium mt-1">
                     <span>총 {c.order_count || 0}회 주문</span>
                     {Number(c.address_count || 0) > 1 && (
-                      <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold border border-slate-200">
-                        등록 배송지: {c.address_count}곳
+                      <span className="bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-bold border border-emerald-200">
+                        배송지 {c.address_count}곳
                       </span>
                     )}
                     {c.last_order_date && <span>최근: {c.last_order_date}</span>}
@@ -693,49 +723,65 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
           )}
         </div>
 
-        {/* 우측: 고객 상세 정보 및 다중 배송지 관리 */}
-        <div className="bg-white rounded-2xl border-2 border-slate-300 p-5 shadow-xs">
-          <div className="border-b border-slate-200 pb-2.5 mb-3 flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-base font-black text-slate-900 flex items-center gap-1.5">
-              <UserCheck className="w-4 h-4 text-emerald-700" />
-              <span>고객 상세 정보</span>
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => openModalSafely("manual")}
-                className="text-xs font-bold text-slate-700 hover:text-emerald-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-1 rounded cursor-pointer whitespace-nowrap"
-              >
-                + 신규 고객 등록
-              </button>
-              {selectedCustomerId && (
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
-                  #{customerDetail?.customer?.customer_code || selectedCustomerId}
+      {/* ────────────────────────────────────────────────────────── */}
+      {/* [고객 상세 & 관리 전용 팝업 모달] */}
+      {/* ────────────────────────────────────────────────────────── */}
+      {showDetailModal && customerDetail && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 md:p-6 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl border-2 border-slate-300 overflow-hidden">
+            {/* 팝업 헤더 */}
+            <div className="bg-slate-900 text-white p-4 flex items-center justify-between gap-2 flex-wrap shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-200 border border-slate-700 whitespace-nowrap shrink-0">
+                  #{customerDetail.customer.customer_code || customerDetail.customer.id}
                 </span>
-              )}
-            </div>
-          </div>
+                {getCustomerGradeBadge(customerDetail.customer)}
+                <h3 className="text-base md:text-lg font-black text-white">
+                  {customerDetail.customer.name} 님 고객 상세 관리
+                </h3>
+              </div>
 
-          {!customerDetail ? (
-            <div className="py-16 text-center text-slate-500 text-sm space-y-3">
-              <p>왼쪽 목록에서 고객을 선택하면 상세 정보, 누적 판매 통계, 배송지 목록이 표시됩니다.</p>
-              <button
-                type="button"
-                onClick={() => openModalSafely("manual")}
-                className="inline-flex items-center gap-1 bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>지금 새 고객 등록하기</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                {onSelectAddressForOrder && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeModalSafely();
+                      onSelectAddressForOrder(customerDetail.customer);
+                    }}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap shadow-xs"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>이 고객으로 새 주문</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleDeleteCustomer}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-red-300 hover:text-white hover:bg-red-900/60 border border-red-800/80 px-2.5 py-1.5 rounded-lg cursor-pointer whitespace-nowrap"
+                  title="고객 삭제"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>고객 삭제</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={closeModalSafely}
+                  className="text-slate-400 hover:text-white p-1 rounded cursor-pointer"
+                  title="닫기"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-4 text-sm">
+
+            {/* 팝업 스크롤 본문 */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 text-sm">
               {/* 고객 기본 프로필 카드 */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="text-lg font-black text-slate-900 flex items-center gap-2">
-                    <span>{customerDetail.customer.name} 님</span>
-                    {getCustomerGradeBadge(customerDetail.customer)}
+                    <span>{customerDetail.customer.name} 님 기본 정보</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {onSelectAddressForOrder && (
@@ -992,9 +1038,9 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                 )}
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 모달 1: 가져온 연락처 확인 및 일괄 등록 팝업 */}
       {importContactsModal && (

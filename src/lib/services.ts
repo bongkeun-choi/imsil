@@ -1677,9 +1677,12 @@ export async function deleteCustomerService(id: number) {
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");
   const check = await db.execute({ sql: `SELECT COUNT(*) as cnt FROM orders WHERE customer_id=?`, args: [id] });
-  if (Number(check.rows[0]?.cnt) > 0) {
-    throw new Error("주문 이력이 있는 고객은 삭제할 수 없습니다.");
+  const cnt = Number(check.rows[0]?.cnt || 0);
+  if (cnt > 0) {
+    throw new Error(`주문 이력(${cnt}건)이 있는 고객은 데이터 무결성을 위해 삭제할 수 없습니다. 대신 고객 수정에서 메모에 '미사용'으로 변경하세요.`);
   }
+  // 등록된 배송지 목록 먼저 안전 삭제
+  await db.execute({ sql: `DELETE FROM customer_addresses WHERE customer_id=?`, args: [id] });
   await db.execute({ sql: `DELETE FROM customers WHERE id=?`, args: [id] });
 }
 
