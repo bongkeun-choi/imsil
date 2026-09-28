@@ -27,6 +27,7 @@ async function initDb() {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS customers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_code TEXT UNIQUE,
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
       phone2 TEXT,
@@ -41,11 +42,32 @@ async function initDb() {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS customer_addresses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER NOT NULL,
+      alias TEXT NOT NULL DEFAULT '기본 자택',
+      recipient_name TEXT NOT NULL,
+      recipient_phone TEXT NOT NULL,
+      zipcode TEXT,
+      address TEXT NOT NULL,
+      address_detail TEXT,
+      delivery_memo TEXT,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(customer_id) REFERENCES customers(id)
+    );
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS products (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT UNIQUE,
       name TEXT NOT NULL,
+      category TEXT DEFAULT '절임배추류',
       weight_kg INTEGER NOT NULL,
       price INTEGER NOT NULL,
+      unit TEXT DEFAULT '박스',
       active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL

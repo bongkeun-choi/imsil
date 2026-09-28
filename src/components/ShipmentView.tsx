@@ -313,17 +313,17 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
             </h2>
             <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm font-bold text-slate-600 mt-0.5">
               <span>도착일 전날 포장하여 전달합니다.</span>
-              <span className="text-emerald-900 font-extrabold whitespace-nowrap">일반 택배: {normalQty20kg}박스</span>
+              <span className="text-emerald-900 font-bold whitespace-nowrap">일반 택배: {normalQty20kg}박스</span>
               {eventQty20kg > 0 && (
-                <span className="bg-purple-100 text-purple-900 border border-purple-300 px-2 py-0.5 rounded-full font-black flex items-center gap-1 whitespace-nowrap">
-                  <span>🎪</span>
+                <span className="bg-slate-200 text-slate-800 border border-slate-300 px-2 py-0.5 rounded-full font-bold flex items-center gap-1 whitespace-nowrap">
+                  <span>[행사]</span>
                   <span>임실 김치 축제: {eventQty20kg}박스 ({eventOrders.length}건)</span>
                 </span>
               )}
               <span className="whitespace-nowrap">(총 {totalQty20kg}박스)</span>
             </div>
           </div>
-          <span className="text-xs md:text-sm text-slate-600 font-semibold">
+          <span className="text-xs text-slate-600">
             박스 포장 후 체크 버튼을 누르면 포장완료 처리됩니다.
           </span>
         </div>
@@ -356,13 +356,13 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
             <button
               type="button"
               onClick={() => setOrderFilter("EVENT")}
-              className={`px-2.5 py-1 rounded-lg text-xs md:text-sm font-black transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+              className={`px-2.5 py-1 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 orderFilter === "EVENT"
-                  ? "bg-purple-700 text-white shadow-xs"
-                  : "bg-purple-100 text-purple-900 hover:bg-purple-200 border border-purple-300"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300"
               }`}
             >
-              <span>🎪</span>
+              <span>[행사]</span>
               <span>행사 납품 ({eventOrders.length}건 &middot; {eventQty20kg}박스)</span>
             </button>
           </div>
@@ -403,17 +403,27 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-1 flex-1 min-w-[280px]">
                         <div className="flex items-center gap-2 flex-wrap">
-                          {isEvent && (
-                            <span className="shrink-0 px-2 py-0.5 text-xs font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-md inline-flex items-center gap-1 whitespace-nowrap">
-                              <span>🎪</span>
-                              <span>{ord.event_name || "임실 김치 축제"} 납품</span>
+                          {ord.customer_code && (
+                            <span className="shrink-0 px-2 py-0.5 text-xs font-black font-mono bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md whitespace-nowrap">
+                              #{ord.customer_code}
                             </span>
                           )}
-                          <span className="text-xl md:text-2xl font-black text-slate-900">
+                          {ord.order_no && (
+                            <span className="shrink-0 px-1.5 py-0.5 text-[11px] font-bold font-mono bg-slate-100 text-slate-600 border border-slate-200 rounded-md whitespace-nowrap">
+                              #{ord.order_no}
+                            </span>
+                          )}
+                          {isEvent && (
+                            <span className="shrink-0 px-2 py-0.5 text-xs font-bold bg-slate-200 text-slate-800 border border-slate-300 rounded-md inline-flex items-center gap-1 whitespace-nowrap">
+                              <span>[행사]</span>
+                              <span>{ord.event_name || "임실 김치 축제"}</span>
+                            </span>
+                          )}
+                          <span className="text-base md:text-lg font-bold text-slate-900">
                             {ord.customer_name}
                           </span>
                         {ord.customer_phone ? (
-                          <div className="inline-flex items-center text-sm md:text-base font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md whitespace-nowrap">
+                          <div className="inline-flex items-center text-xs md:text-sm font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md whitespace-nowrap">
                             <PhoneCallLink
                               phone={ord.customer_phone}
                               name={ord.customer_name}
@@ -429,35 +439,35 @@ export function ShipmentView({ settings, onRequestConfig }: ShipmentViewProps) {
                         <button
                           type="button"
                           onClick={() => handleOpenOrderShare(ord)}
-                          className="inline-flex items-center gap-1 text-xs md:text-sm font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                          className="inline-flex items-center gap-1 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-0.5 rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0"
                           title="문자·카톡 안내장 전송"
                         >
-                          <Share2 className="w-3.5 h-3.5 text-amber-700" />
+                          <Share2 className="w-3.5 h-3.5 text-slate-700" />
                           <span>문자·카톡</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleOpenOrderEdit(ord)}
-                          className="inline-flex items-center gap-1 text-xs md:text-sm font-bold text-blue-900 bg-blue-50 hover:bg-blue-100 border border-blue-300 px-2 py-0.5 rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                          className="inline-flex items-center gap-1 text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2 py-0.5 rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0"
                           title="주문 정보 수정"
                         >
-                          <Edit3 className="w-3.5 h-3.5 text-blue-700" />
+                          <Edit3 className="w-3.5 h-3.5 text-slate-700" />
                           <span>수정</span>
                         </button>
                       </div>
 
-                      <div className="text-lg md:text-xl font-black text-emerald-900">
+                      <div className="text-base font-bold text-emerald-900">
                         {(ord.items || [])
                           .map((i: any) => `${i.product_name} × ${i.quantity}개`)
                           .join("  /  ")}
                       </div>
 
                       {isEvent ? (
-                        <div className="text-sm md:text-base text-purple-900 font-bold bg-purple-50/80 border border-purple-200 rounded-lg px-2.5 py-1 inline-block">
-                          🎪 {ord.shipping_address ? `납품장소: ${ord.shipping_address} ${ord.shipping_address_detail || ""}` : "행사 현장 직접 납품 (택배 발송 없음)"}
+                        <div className="text-xs md:text-sm text-slate-800 font-bold bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1 inline-block">
+                          [행사납품] {ord.shipping_address ? `납품장소: ${ord.shipping_address} ${ord.shipping_address_detail || ""}` : "행사 현장 직접 납품 (택배 발송 없음)"}
                         </div>
                       ) : (
-                        <div className="text-base md:text-lg text-slate-800 font-medium">
+                        <div className="text-sm text-slate-800">
                           주소: {ord.shipping_address} {ord.shipping_address_detail}
                         </div>
                       )}

@@ -217,12 +217,12 @@ export function OrderEditModal({
           {/* 주문 구분: 일반 주문 vs 행사·축제 납품 */}
           <div className="bg-slate-100 p-2.5 rounded-xl border-2 border-slate-300 space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs md:text-sm font-extrabold text-slate-800">
+              <label className="text-xs md:text-sm font-bold text-slate-800">
                 주문 구분 설정
               </label>
               {isEvent && (
-                <span className="text-xs font-black text-purple-800 bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-full whitespace-nowrap">
-                  🎪 행사 납품 모드
+                <span className="text-xs font-bold text-slate-800 bg-slate-200 border border-slate-300 px-2 py-0.5 rounded-md whitespace-nowrap">
+                  [행사 납품 모드]
                 </span>
               )}
             </div>
@@ -231,24 +231,24 @@ export function OrderEditModal({
               <button
                 type="button"
                 onClick={() => setIsEvent(false)}
-                className={`py-1.5 px-2 rounded-lg font-black text-xs md:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border-2 whitespace-nowrap ${
+                className={`py-1.5 px-2 rounded-lg font-bold text-xs md:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border whitespace-nowrap ${
                   !isEvent
-                    ? "bg-emerald-700 text-white border-emerald-800 shadow-sm"
+                    ? "bg-emerald-700 text-white border-emerald-800 shadow-xs"
                     : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
                 }`}
               >
-                <span>📦 일반 고객 주문</span>
+                <span>일반 고객 주문</span>
               </button>
               <button
                 type="button"
                 onClick={() => setIsEvent(true)}
-                className={`py-1.5 px-2 rounded-lg font-black text-xs md:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border-2 whitespace-nowrap ${
+                className={`py-1.5 px-2 rounded-lg font-bold text-xs md:text-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border whitespace-nowrap ${
                   isEvent
-                    ? "bg-purple-700 text-white border-purple-800 shadow-sm ring-2 ring-purple-300"
+                    ? "bg-slate-900 text-white border-slate-900 shadow-xs"
                     : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
                 }`}
               >
-                <span>🎪 행사·축제 납품</span>
+                <span>행사·축제 납품</span>
               </button>
             </div>
 

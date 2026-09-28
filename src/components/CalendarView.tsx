@@ -414,9 +414,9 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                                 일반: {summary.normalQty20kg}박스
                               </div>
                             )}
-                            <div className="bg-purple-100 text-purple-900 border border-purple-300 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate font-black flex items-center gap-0.5" title={`${summary.eventNames?.join(", ") || "임실 김치 축제"} 납품`}>
-                              <span className="text-[10px]">🎪</span>
-                              <span>축제: {summary.eventQty20kg}박스</span>
+                            <div className="bg-slate-200 text-slate-800 border border-slate-300 px-1 py-0.2 md:px-1.5 md:py-0.5 rounded-xs truncate font-bold flex items-center gap-0.5" title={`${summary.eventNames?.join(", ") || "임실 김치 축제"} 납품`}>
+                              <span>[행사]</span>
+                              <span>{summary.eventQty20kg}박스</span>
                             </div>
                           </div>
                         ) : (
@@ -515,8 +515,8 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                               <span>일반 20kg:</span>
                               <span>{summary.normalQty20kg ?? 0}박스</span>
                             </div>
-                            <div className="flex justify-between text-purple-900 font-black bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                              <span className="flex items-center gap-1">🎪 축제 납품:</span>
+                            <div className="flex justify-between text-slate-900 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300">
+                              <span className="flex items-center gap-1">[행사] 축제 납품:</span>
                               <span>{summary.eventQty20kg}박스</span>
                             </div>
                           </>
@@ -579,8 +579,8 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
             <div className="flex flex-wrap items-center gap-2 text-base text-slate-600 font-bold mt-1">
               <span>절임배추 20kg: <span className="text-emerald-800 font-black">{selectedDaySummary.normalQty20kg ?? selectedDaySummary.qty20kg}박스</span></span>
               {(selectedDaySummary.eventQty20kg ?? 0) > 0 && (
-                <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-900 border border-purple-300 px-2 py-0.5 rounded-full text-xs font-black">
-                  <span>🎪</span>
+                <span className="inline-flex items-center gap-1 bg-slate-200 text-slate-800 border border-slate-300 px-2 py-0.5 rounded-full text-xs font-bold">
+                  <span>[행사]</span>
                   <span>{selectedDaySummary.eventNames?.join(", ") || "임실 김치 축제"}: {selectedDaySummary.eventQty20kg}박스 ({selectedDaySummary.eventOrdersCount}건)</span>
                 </span>
               )}
@@ -625,13 +625,13 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
             <button
               type="button"
               onClick={() => setOrderFilter("EVENT")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 orderFilter === "EVENT"
-                  ? "bg-purple-700 text-white shadow-xs"
-                  : "bg-purple-100 text-purple-900 hover:bg-purple-200 border border-purple-300"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300"
               }`}
             >
-              <span>🎪</span>
+              <span>[행사]</span>
               <span>행사 납품 ({selectedDaySummary.eventOrdersCount}건 &middot; {selectedDaySummary.eventQty20kg}박스)</span>
             </button>
           </div>
@@ -662,8 +662,8 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                     {/* 고객 정보 행 */}
                     <div className="flex items-center gap-2 flex-wrap">
                       {isEvent && (
-                        <span className="shrink-0 px-2 py-0.5 text-xs font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-md inline-flex items-center gap-1">
-                          <span>🎪</span>
+                        <span className="shrink-0 px-2 py-0.5 text-xs font-bold bg-slate-200 text-slate-800 border border-slate-300 rounded-md inline-flex items-center gap-1">
+                          <span>[행사]</span>
                           <span>{ord.event_name || "임실 김치 축제"}</span>
                         </span>
                       )}
@@ -677,7 +677,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                       <span className="text-sm font-black text-slate-900 ml-auto stat-number">{formatPrice(ord.total_amount)}</span>
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5">
-                      {isEvent ? (ord.shipping_address ? `납품위치: ${ord.shipping_address}` : "🎪 행사 현장 직접 납품 (택배 없음)") : (ord.shipping_address || "주소 미입력")}
+                      {isEvent ? (ord.shipping_address ? `납품위치: ${ord.shipping_address}` : "[행사] 현장 직접 납품 (택배 없음)") : (ord.shipping_address || "주소 미입력")}
                     </div>
                     {/* 상태 + 버튼 행 - 한 줄 유지 */}
                     <div className="flex items-center gap-1.5 mt-2 overflow-x-auto whitespace-nowrap">
@@ -750,8 +750,8 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                     일반 20kg: {selectedDaySummary.normalQty20kg ?? selectedDaySummary.qty20kg}박스
                   </span>
                   {(selectedDaySummary.eventQty20kg ?? 0) > 0 && (
-                    <span className="bg-purple-900 text-purple-200 border border-purple-400 px-2.5 py-0.5 rounded-full font-black flex items-center gap-1">
-                      <span>🎪</span>
+                    <span className="bg-slate-800 text-slate-100 border border-slate-600 px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      <span>[행사]</span>
                       <span>{selectedDaySummary.eventNames?.join(", ") || "축제"}: {selectedDaySummary.eventQty20kg}박스</span>
                     </span>
                   )}
@@ -799,13 +799,13 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                 <button
                   type="button"
                   onClick={() => setOrderFilter("EVENT")}
-                  className={`px-3 py-1 rounded-lg text-xs md:text-sm font-black transition-all cursor-pointer flex items-center gap-1 ${
+                  className={`px-3 py-1 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer flex items-center gap-1 ${
                     orderFilter === "EVENT"
-                      ? "bg-purple-700 text-white"
-                      : "bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-300"
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300"
                   }`}
                 >
-                  <span>🎪 행사 납품 ({selectedDaySummary.eventOrdersCount}건)</span>
+                  <span>[행사] 행사 납품 ({selectedDaySummary.eventOrdersCount}건)</span>
                 </button>
               </div>
             )}
@@ -834,8 +834,8 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       {isEvent && (
-                        <span className="shrink-0 px-2 py-0.5 text-xs font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-md inline-flex items-center gap-1">
-                          <span>🎪</span>
+                        <span className="shrink-0 px-2 py-0.5 text-xs font-bold bg-slate-200 text-slate-800 border border-slate-300 rounded-md inline-flex items-center gap-1">
+                          <span>[행사]</span>
                           <span>{ord.event_name || "임실 김치 축제"}</span>
                         </span>
                       )}
@@ -914,7 +914,7 @@ export function CalendarView({ onSelectDateForNewOrder, settings }: CalendarView
                   <div className="text-sm md:text-base text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
                     <div className="font-semibold">
                       <span className="text-slate-500 font-normal mr-1.5">{isEvent ? "납품장소:" : "배송지:"}</span>
-                      {isEvent ? (ord.shipping_address || "🎪 행사 현장 직접 납품 (택배 없음)") : (ord.shipping_address || "주소 미입력")}
+                      {isEvent ? (ord.shipping_address || "[행사] 현장 직접 납품 (택배 없음)") : (ord.shipping_address || "주소 미입력")}
                     </div>
                     {ord.items_summary && (
                       <div className="mt-1 font-bold text-emerald-900">

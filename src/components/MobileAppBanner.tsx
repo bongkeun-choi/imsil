@@ -67,7 +67,7 @@ export function MobileAppBanner() {
           </div>
           <div className="truncate">
             <p className="text-xs font-bold leading-tight">
-              🥬 앱으로 설치하여 시원하게 사용하기
+              앱으로 설치하여 시원하게 사용하기
             </p>
             <p className="text-[11px] text-emerald-200 truncate">
               홈 화면에 추가하면 상단 주소창 없이 진짜 앱처럼 넓게 열립니다

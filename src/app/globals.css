@@ -32,9 +32,11 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
+  font-family: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* 어르신/현장 터치 최적화 버튼 최소 높이 */
@@ -48,6 +50,40 @@ body {
 .stat-number {
   font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* 필수 지침: 단일 행(No-Wrap) 및 자음/모음 세로 쪼개짐 방지 전역 클래스 */
+.no-wrap, .table-no-wrap th, .table-no-wrap td {
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  word-break: keep-all !important;
+}
+
+/* 고객 코드 & 품목 코드 전용 프리미엄 뱃지 스타일 */
+.badge-code {
+  display: inline-flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 모던 슬림 스크롤바 (가로 스크롤 테이블 가독성 향상) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* 모바일 네이티브 앱 환경 최적화 */

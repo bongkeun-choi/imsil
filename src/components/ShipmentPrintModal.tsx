@@ -88,7 +88,7 @@ export function ShipmentPrintModal({
           .filter(Boolean)
           .join(" ");
         const addr = isEv
-          ? (rawAddr || `<span style="color:#7e22ce;font-weight:700;">🎪 행사 현장 직접 납품 (택배 없음)</span>`)
+          ? (rawAddr || `<span style="color:#0f172a;font-weight:700;">[행사] 현장 직접 납품 (택배 없음)</span>`)
           : (rawAddr || "-");
         const phoneCell = isEv
           ? (o.customer_phone ? o.customer_phone : `<span style="color:#9ca3af;">(생략)</span>`)
@@ -103,7 +103,7 @@ export function ShipmentPrintModal({
             <td style="padding:9px 7px;text-align:center;font-weight:700;color:#64748b;font-size:13px;">${idx + 1}</td>
             <td style="padding:9px 7px;font-weight:800;font-size:15px;color:#0f172a;white-space:nowrap;">
               ${o.customer_name}
-              ${isEv ? `<span style="display:inline-block;padding:1px 5px;background:#f3e8ff;color:#6b21a8;border:1px solid #d8b4fe;border-radius:3px;font-size:11px;font-weight:800;margin-left:4px;">🎪 ${o.event_name || "행사납품"}</span>` : ""}
+              ${isEv ? `<span style="display:inline-block;padding:1px 5px;background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;border-radius:3px;font-size:11px;font-weight:800;margin-left:4px;">[행사] ${o.event_name || "행사납품"}</span>` : ""}
             </td>
             <td style="padding:9px 7px;font-size:13px;color:#065f46;font-weight:600;white-space:nowrap;">${phoneCell}</td>
             <td style="padding:9px 7px;font-weight:800;color:#064e3b;font-size:15px;text-align:center;">${totalQty}박스</td>
@@ -148,7 +148,7 @@ export function ShipmentPrintModal({
   <!-- 발송 헤더 -->
   <div class="header">
     <div class="sender-block">
-      <h1>📦 ${shopName} 발송 명단</h1>
+      <h1>${shopName} 발송 명단</h1>
       <p>보내는 사람: <strong>${ownerName || shopName}</strong>&nbsp;&nbsp;|&nbsp;&nbsp;연락처: <strong>${contactsDisplay || shopPhone}</strong></p>
       <p>택배 도착 예정일: <strong>${selectedDate}</strong></p>
     </div>
@@ -157,7 +157,7 @@ export function ShipmentPrintModal({
       <div class="badges">
         <span class="badge badge-green">총 ${orders.length}건</span>
         <span class="badge badge-amber">일반: ${normalBoxes}박스</span>
-        ${eventBoxes > 0 ? `<span class="badge badge-purple">🎪 김치축제: ${eventBoxes}박스</span>` : ""}
+        ${eventBoxes > 0 ? `<span class="badge badge-purple">[행사] 김치축제: ${eventBoxes}박스</span>` : ""}
         <span class="badge badge-amber">총 ${totalBoxes}박스 (${totalWeight}kg)</span>
       </div>
     </div>
@@ -244,7 +244,7 @@ export function ShipmentPrintModal({
               const addr = [o.shipping_address, o.shipping_address_detail].filter(Boolean).join(" ");
               const phoneStr = o.customer_phone ? ` ${o.customer_phone}` : (isEv ? "" : " (연락처없음)");
               const addrStr = addr ? ` ${addr}` : (isEv ? " [행사직납]" : "");
-              return `${i + 1}. ${isEv ? "🎪 " : ""}${o.customer_name}${phoneStr} ${qty}박스${addrStr}${o.memo ? " ["+o.memo+"]" : ""}`;
+              return `${i + 1}. ${isEv ? "[행사] " : ""}${o.customer_name}${phoneStr} ${qty}박스${addrStr}${o.memo ? " ["+o.memo+"]" : ""}`;
             }).join("\n"),
         });
         setShareStatus("idle");
@@ -312,8 +312,8 @@ export function ShipmentPrintModal({
           <span className="bg-emerald-700 text-white px-3 py-1">총 {orders.length}건</span>
           <span className="bg-amber-700 text-white px-3 py-1">일반 {normalBoxes}박스</span>
           {eventBoxes > 0 && (
-            <span className="bg-purple-700 text-purple-100 border border-purple-400 px-3 py-1 flex items-center gap-1 font-black">
-              <span>🎪</span>
+            <span className="bg-slate-700 text-slate-100 border border-slate-500 px-3 py-1 flex items-center gap-1 font-bold">
+              <span>[행사]</span>
               <span>김치축제 {eventBoxes}박스</span>
             </span>
           )}
@@ -323,9 +323,9 @@ export function ShipmentPrintModal({
             <span className="bg-red-700 text-white px-3 py-1">미입금 {unpaidCount}건 주의</span>
           )}
           {shareStatus === "unsupported" ? (
-            <span className="text-amber-300 ml-auto text-xs">⚠️ 이 기기는 공유를 지원하지 않습니다. PDF 저장 후 팩스 앱에서 직접 전송하세요.</span>
+            <span className="text-amber-300 ml-auto text-xs">[안내] 이 기기는 공유를 지원하지 않습니다. PDF 저장 후 팩스 앱에서 직접 전송하세요.</span>
           ) : (
-            <span className="text-slate-400 ml-auto text-xs">📠 팩스/공유 버튼 → 모바일팩스 앱 선택</span>
+            <span className="text-slate-400 ml-auto text-xs">팩스/공유 버튼 → 모바일팩스 앱 선택</span>
           )}
         </div>
 

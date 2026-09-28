@@ -15,7 +15,15 @@ import {
   Eye,
   CheckCircle2,
 } from "lucide-react";
-import { fetchSettingsService, saveSettingsService } from "@/lib/services";
+import {
+  fetchSettingsService,
+  saveSettingsService,
+  fetchAllProductsService,
+  createProductService,
+  updateProductService,
+  deleteProductService,
+  ProductItem,
+} from "@/lib/services";
 import {
   ExtraPhone,
   parseExtraPhones,
@@ -47,6 +55,17 @@ export function SettingsView({
   const [product10Id, setProduct10Id] = useState<number | null>(null);
   const [product20Id, setProduct20Id] = useState<number | null>(null);
 
+  // 전체 품목 목록 및 모달 상태
+  const [productsList, setProductsList] = useState<ProductItem[]>([]);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [newProdCode, setNewProdCode] = useState("");
+  const [newProdName, setNewProdName] = useState("");
+  const [newProdCategory, setNewProdCategory] = useState("절임배추류");
+  const [newProdWeight, setNewProdWeight] = useState(20);
+  const [newProdPrice, setNewProdPrice] = useState(50000);
+  const [newProdUnit, setNewProdUnit] = useState("박스");
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+
   const [previewTab, setPreviewTab] = useState<"unpaid" | "paid">("unpaid");
   const [showPreview, setShowPreview] = useState(true);
 
@@ -54,6 +73,15 @@ export function SettingsView({
   const [saving, setSaving] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const loadAllProducts = async () => {
+    try {
+      const items = await fetchAllProductsService();
+      setProductsList(items);
+    } catch (e) {
+      console.error("Failed to load products list:", e);
+    }
+  };
 
   useEffect(() => {
     fetchSettingsService()
@@ -88,6 +116,7 @@ export function SettingsView({
             }
           }
         }
+        loadAllProducts();
       })
       .catch((e) => {
         console.error("Failed to load settings:", e);
@@ -140,6 +169,95 @@ export function SettingsView({
       const newPos = start + tag.length;
       el.setSelectionRange(newPos, newPos);
     }, 10);
+  };
+
+  // 신규 품목 등록
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProdName.trim()) {
+      alert("품목명을 입력해주세요.");
+      return;
+    }
+    const code = newProdCode.trim() || `PRD-${Date.now().toString().slice(-4)}`;
+    setIsAddingProduct(true);
+    try {
+      await createProductService({
+        code,
+        name: newProdName.trim(),
+        category: newProdCategory.trim(),
+        weight_kg: Number(newProdWeight) || 0,
+        price: Number(newProdPrice) || 0,
+        unit: newProdUnit.trim() || "박스",
+      });
+      alert(`품목 '${newProdName.trim()}'이(가) 등록되었습니다.`);
+      setNewProdCode("");
+      setNewProdName("");
+      setNewProdCategory("절임배추류");
+      setNewProdWeight(20);
+      setNewProdPrice(50000);
+      setNewProdUnit("박스");
+      setShowAddProductModal(false);
+      await loadAllProducts();
+      onSettingsUpdated();
+    } catch (err: any) {
+      alert("품목 등록 실패: " + err.message);
+    } finally {
+      setIsAddingProduct(false);
+    }
+  };
+
+  // 품목 활성/비활성 토글
+  const handleToggleProductActive = async (p: ProductItem) => {
+    try {
+      const nextActive = p.active ? 0 : 1;
+      await updateProductService({
+        id: p.id,
+        active: nextActive,
+      });
+      await loadAllProducts();
+      onSettingsUpdated();
+    } catch (err: any) {
+      alert("품목 상태 변경 실패: " + err.message);
+    }
+  };
+
+  // 품목 단가 수정
+  const handleProductPriceChange = async (p: ProductItem, newPrice: number) => {
+    try {
+      await updateProductService({
+        id: p.id,
+        price: newPrice,
+      });
+      if (p.id === product20Id) setPrice20kg(newPrice);
+      if (p.id === product10Id) setPrice10kg(newPrice);
+      await loadAllProducts();
+      onSettingsUpdated();
+    } catch (err: any) {
+      alert("단가 변경 실패: " + err.message);
+    }
+  };
+
+  // 품목 삭제
+  const handleDeleteProduct = async (p: ProductItem) => {
+    if (p.id === product20Id) {
+      alert("기본 절임배추 20kg 품목은 삭제할 수 없습니다.");
+      return;
+    }
+    if (!confirm(`'${p.name}' 품목을 삭제하시겠습니까?\n(과거 주문 이력이 있는 경우 판매중지로 안전하게 변경됩니다)`)) {
+      return;
+    }
+    try {
+      const res = await deleteProductService(p.id);
+      if (res.deactivated) {
+        alert("이 품목은 과거 주문 이력이 있어 판매중지(비활성화) 처리되었습니다.");
+      } else {
+        alert("품목이 삭제되었습니다.");
+      }
+      await loadAllProducts();
+      onSettingsUpdated();
+    } catch (err: any) {
+      alert("품목 삭제 실패: " + err.message);
+    }
   };
 
   // 기본 문구로 복원
@@ -400,8 +518,8 @@ export function SettingsView({
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">
-                💡 팁: <strong>{`{대표전화}`}</strong>를 넣으면 등록된 대표 연락처들이 자동으로 연결되어 표시됩니다.
+              <p className="text-[11px] text-slate-500 font-medium">
+                [안내] <strong>{`{대표전화}`}</strong>를 넣으면 등록된 대표 연락처들이 자동으로 연결되어 표시됩니다.
               </p>
             </div>
 
@@ -535,37 +653,157 @@ export function SettingsView({
             </div>
           </div>
 
-          {/* 4. 판매 상품 단가 설정 */}
+          {/* 4. 품목(상품) 및 단가 관리 */}
           <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 md:p-6 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
-                <Tag className="w-6 h-6 text-emerald-700" />
-                <span>판매 상품 단가 설정</span>
-              </h2>
-              <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md">
-                현재 판매 품목: 절임배추 20kg 단일 규격
-              </span>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+              <div>
+                <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
+                  <Tag className="w-6 h-6 text-emerald-700" />
+                  <span>품목(상품) 및 단가 관리</span>
+                </h2>
+                <p className="text-xs md:text-sm text-slate-500 font-medium mt-1">
+                  절임배추 외에도 김치 양념, 고춧가루 등 다양한 판매 품목을 코드로 체계적으로 관리할 수 있습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddProductModal(true)}
+                className="inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl text-sm font-bold shadow-xs cursor-pointer transition-all active:scale-95 whitespace-nowrap shrink-0 ml-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ 새 품목 추가</span>
+              </button>
             </div>
 
-            <div className="bg-emerald-50/80 p-5 rounded-2xl border-2 border-emerald-400 space-y-2">
-              <label className="block text-xl font-black text-emerald-950 mb-1">
-                절임배추 20kg (1박스) 판매 단가 (원) <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="number"
-                value={price20kg}
-                onChange={(e) => setPrice20kg(Number(e.target.value))}
-                step="1000"
-                className="w-full text-3xl font-black border-2 border-emerald-500 rounded-xl px-4 py-3 stat-number bg-white text-emerald-950 focus:border-emerald-700 focus:outline-hidden"
-                required
-              />
-              <div className="text-sm font-black text-emerald-800">
-                현재 주문서 적용 단가: {formatPrice(price20kg)}원
+            {/* 대표 절임배추 20kg 바로가기 단가 설정 (기존 사용성 100% 보존) */}
+            <div className="bg-emerald-50/90 p-4 md:p-5 rounded-2xl border-2 border-emerald-400 space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <label className="block text-lg md:text-xl font-black text-emerald-950">
+                  대표 품목: 절임배추 20kg (1박스) 판매 단가 (원) <span className="text-red-600">*</span>
+                </label>
+                <span className="text-xs font-black font-mono px-2 py-0.5 rounded bg-emerald-200 text-emerald-900 whitespace-nowrap shrink-0">
+                  코드: CAB-20
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  value={price20kg}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setPrice20kg(val);
+                    if (product20Id) {
+                      setProductsList((prev) =>
+                        prev.map((item) => (item.id === product20Id ? { ...item, price: val } : item))
+                      );
+                    }
+                  }}
+                  step="1000"
+                  className="w-full text-2xl md:text-3xl font-black border-2 border-emerald-500 rounded-xl px-4 py-2.5 stat-number bg-white text-emerald-950 focus:border-emerald-700 focus:outline-hidden"
+                  required
+                />
+              </div>
+              <div className="text-xs md:text-sm font-bold text-emerald-800">
+                현재 주문서 기본 적용 단가: {formatPrice(price20kg)}원
               </div>
             </div>
 
-            <div className="bg-slate-100 p-4 rounded-xl border border-slate-300 text-xs md:text-sm text-slate-600 font-medium leading-relaxed">
-              💡 <strong>상품 확장 안내:</strong> 현재는 <strong>절임배추 20kg</strong> 단일 규격으로만 주문 접수됩니다. 추후 알타리김치, 갓김치, 고춧가루 또는 10kg 포장 등 추가 품목 판매 시 관리자 설정에서 즉시 확장할 수 있도록 시스템이 구축되어 있습니다.
+            {/* 전체 등록된 품목 목록 테이블 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm font-bold text-slate-700 px-1">
+                <span>등록된 판매 품목 목록 ({productsList.length}개)</span>
+                <span className="text-xs text-slate-400 font-normal">단가를 수정한 후 아래 [전체 설정 저장하기]를 눌러주세요.</span>
+              </div>
+
+              <div className="overflow-x-auto border-2 border-slate-300 rounded-xl bg-white shadow-xs">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-slate-100 border-b border-slate-300 text-slate-700 font-black">
+                    <tr>
+                      <th className="py-2.5 px-3 whitespace-nowrap">품목 코드</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">분류</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">품목명</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">규격/단위</th>
+                      <th className="py-2.5 px-3 whitespace-nowrap">판매 단가(원)</th>
+                      <th className="py-2.5 px-3 text-center whitespace-nowrap">판매 상태</th>
+                      <th className="py-2.5 px-3 text-center whitespace-nowrap">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {productsList.map((p) => {
+                      const isMain20kg = p.id === product20Id;
+                      return (
+                        <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${p.active ? "" : "bg-slate-50/60 opacity-60"}`}>
+                          <td className="py-2.5 px-3 font-mono font-black text-indigo-700 whitespace-nowrap">
+                            <span className="bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md">
+                              #{p.code}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-bold">
+                              {p.category || "일반"}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-slate-900 whitespace-nowrap">
+                            {p.name}
+                            {isMain20kg && (
+                              <span className="ml-1.5 text-[11px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-black">
+                                대표
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 font-bold whitespace-nowrap">
+                            {p.weight_kg ? `${p.weight_kg}kg / ` : ""}{p.unit || "개"}
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                value={p.price}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setProductsList((prev) =>
+                                    prev.map((item) => (item.id === p.id ? { ...item, price: val } : item))
+                                  );
+                                  if (isMain20kg) setPrice20kg(val);
+                                  if (p.id === product10Id) setPrice10kg(val);
+                                }}
+                                step="1000"
+                                className="w-28 font-bold border border-slate-300 rounded-lg px-2 py-1 text-right focus:border-emerald-600 focus:outline-hidden"
+                              />
+                              <span className="text-xs text-slate-500 font-bold">원</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleProductActive(p)}
+                              className={`px-2.5 py-1 rounded-md text-xs font-black cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                                p.active
+                                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                  : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                              }`}
+                            >
+                              {p.active ? "판매중" : "판매중지"}
+                            </button>
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                            {!isMain20kg && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteProduct(p)}
+                                className="text-slate-400 hover:text-red-600 p-1 rounded transition-colors cursor-pointer"
+                                title="품목 삭제"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -579,6 +817,139 @@ export function SettingsView({
             <span>{saving ? "설정 저장 중..." : "전체 설정 저장하기"}</span>
           </button>
         </form>
+
+        {/* 신규 품목 추가 모달 */}
+        {showAddProductModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border-4 border-emerald-600 flex flex-col max-h-[90vh]">
+              <div className="bg-emerald-700 text-white p-4 md:p-5 rounded-t-[20px] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-6 h-6" />
+                  <h3 className="text-xl md:text-2xl font-black">신규 판매 품목 등록</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAddProductModal(false)}
+                  className="text-white hover:bg-emerald-800 p-1.5 rounded-full cursor-pointer transition-colors"
+                >
+                  <Trash2 className="hidden" />
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateProduct} className="p-5 space-y-4 overflow-y-auto flex-1">
+                <div>
+                  <label className="block text-sm font-bold text-slate-800 mb-1">
+                    품목 코드 (영문/숫자) <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newProdCode}
+                    onChange={(e) => setNewProdCode(e.target.value.toUpperCase())}
+                    placeholder="예: CAB-20, SAU-05, PEP-01"
+                    className="w-full font-mono text-base font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                    required
+                  />
+                  <span className="text-[11px] text-slate-400">품목을 식별하는 고유 코드입니다.</span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-800 mb-1">
+                    품목명 <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newProdName}
+                    onChange={(e) => setNewProdName(e.target.value)}
+                    placeholder="예: 김치 양념 5kg, 고춧가루 1kg"
+                    className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3.5 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-800 mb-1">
+                      분류(카테고리)
+                    </label>
+                    <select
+                      value={newProdCategory}
+                      onChange={(e) => setNewProdCategory(e.target.value)}
+                      className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3 py-2.5 focus:border-emerald-600 focus:outline-hidden bg-white"
+                    >
+                      <option value="절임배추류">절임배추류</option>
+                      <option value="김치양념류">김치양념류</option>
+                      <option value="고춧가루류">고춧가루류</option>
+                      <option value="김치완제품">김치완제품</option>
+                      <option value="일반농산물">일반농산물</option>
+                      <option value="기타">기타</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-800 mb-1">
+                      규격 단위
+                    </label>
+                    <input
+                      type="text"
+                      value={newProdUnit}
+                      onChange={(e) => setNewProdUnit(e.target.value)}
+                      placeholder="예: 박스, 통, 봉, 포"
+                      className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-800 mb-1">
+                      무게 (kg)
+                    </label>
+                    <input
+                      type="number"
+                      value={newProdWeight}
+                      onChange={(e) => setNewProdWeight(Number(e.target.value))}
+                      step="0.5"
+                      className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-800 mb-1">
+                      판매 단가 (원) <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={newProdPrice}
+                      onChange={(e) => setNewProdPrice(Number(e.target.value))}
+                      step="1000"
+                      className="w-full text-base font-bold border-2 border-slate-300 rounded-xl px-3 py-2.5 focus:border-emerald-600 focus:outline-hidden"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProductModal(false)}
+                    className="flex-1 py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold cursor-pointer transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isAddingProduct}
+                    className="flex-1 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-md"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span>{isAddingProduct ? "등록 중..." : "품목 등록하기"}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

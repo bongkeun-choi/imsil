@@ -247,12 +247,10 @@ function renderJangmonimTemplateCard(
   ctx.arc(cardX + 24, cardY + 20, 13, 0, Math.PI * 2);
   ctx.fillStyle = "#10B981";
   ctx.fill();
+  ctx.strokeStyle = "#FFFFFF";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(cardX + 19, cardY + 15, 10, 10);
   ctx.restore();
-
-  ctx.font = "14px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText("📦", cardX + 24, cardY + 21);
 
   ctx.textAlign = "left";
   ctx.font = `900 17px ${FONT_FAMILY}`;

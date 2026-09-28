@@ -243,12 +243,12 @@ function SalesListTab({ settings }: { settings?: any }) {
               onChange={(e) => setSearch(e.target.value)}
               placeholder={
                 searchType === "CUSTOMER"
-                  ? "고객명 입력 (예: 홍길동)"
+                  ? "고객명 또는 고객코드 (예: C-1001, 홍길동)"
                   : searchType === "PHONE"
                   ? "연락처 입력 (예: 01012345678)"
                   : searchType === "ADDRESS"
                   ? "배송지 주소 입력..."
-                  : "이름·전화·주소 검색 (전체)"
+                  : "이름·고객코드(C-1001)·전화·주소 검색"
               }
               className="w-full pl-9 pr-8 py-2 border-2 border-slate-300 text-sm font-bold focus:border-emerald-500 focus:outline-none"
             />
@@ -292,7 +292,7 @@ function SalesListTab({ settings }: { settings?: any }) {
             >
               <option value="ALL">구분 전체</option>
               <option value="NORMAL">일반 택배</option>
-              <option value="EVENT">🎪 행사 납품</option>
+              <option value="EVENT">[행사] 행사 납품</option>
             </select>
 
             <button
@@ -406,9 +406,14 @@ function SalesListTab({ settings }: { settings?: any }) {
                     <td className="px-3 py-2.5 font-bold text-slate-700 whitespace-nowrap">{o.shipping_date}</td>
                     <td className="px-3 py-2.5 font-extrabold text-slate-900 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 flex-nowrap">
+                        {o.customer_code && (
+                          <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-mono font-black bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-sm whitespace-nowrap">
+                            #{o.customer_code}
+                          </span>
+                        )}
                         {isEv && (
-                          <span className="shrink-0 px-1.5 py-0.5 text-[11px] font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-sm whitespace-nowrap">
-                            🎪 {o.event_name || "행사납품"}
+                          <span className="shrink-0 px-1.5 py-0.5 text-xs font-bold bg-slate-200 text-slate-800 border border-slate-300 rounded-sm whitespace-nowrap">
+                            [행사] {o.event_name || "행사납품"}
                           </span>
                         )}
                         <span>{o.customer_name}</span>
@@ -663,8 +668,8 @@ export function LedgerView({ settings, onRequestConfig }: LedgerViewProps) {
     <div className="max-w-6xl mx-auto space-y-5 pb-24">
       {/* 헤더 */}
       <div className="bg-white border-2 border-slate-300 px-5 py-4">
-        <h1 className="text-2xl md:text-3xl font-black text-slate-900">📒 관리</h1>
-        <p className="text-sm text-slate-500 mt-0.5">전체 판매 내역 및 고객 데이터를 관리합니다</p>
+        <h1 className="text-xl font-bold text-slate-900">판매 및 데이터 관리</h1>
+        <p className="text-xs text-slate-500 mt-0.5">전체 판매 내역 및 고객 데이터를 관리합니다</p>
       </div>
 
       {/* 탭 */}

@@ -1,6 +1,223 @@
 import { getClientDb } from "./clientDb";
 import { format } from "date-fns";
 
+export interface ProductItem {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  weight_kg: number;
+  price: number;
+  unit: string;
+  active: number;
+}
+
+// 한글 성씨 초성별 만 단위 대역 계산 헬퍼 (ㄱ=10000, ㄴ=20000... ㅊ=100000, ㅎ=130000)
+export function getChosungBaseNumber(name: string): number {
+  if (!name || typeof name !== "string" || name.trim().length === 0) return 900000;
+  const firstChar = name.trim()[0];
+  const code = firstChar.charCodeAt(0);
+
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    const chosungIndex = Math.floor((code - 0xac00) / (21 * 28));
+    switch (chosungIndex) {
+      case 0:
+      case 1:
+        return 10000; // ㄱ, ㄲ (김, 강, 고, 구, 곽, 권 등)
+      case 2:
+        return 20000; // ㄴ (나, 노 등)
+      case 3:
+      case 4:
+        return 30000; // ㄷ, ㄸ (도, 두 등)
+      case 5:
+        return 40000; // ㄹ (라, 류 등)
+      case 6:
+        return 50000; // ㅁ (문, 민, 명 등)
+      case 7:
+      case 8:
+        return 60000; // ㅂ, ㅃ (박, 배, 백, 변 등)
+      case 9:
+      case 10:
+        return 70000; // ㅅ, ㅆ (신, 서, 손, 심, 송 등)
+      case 11:
+        return 80000; // ㅇ (이, 임, 안, 오, 유, 양, 원 등)
+      case 12:
+      case 13:
+        return 90000; // ㅈ, ㅉ (정, 조, 장, 전, 진, 주 등)
+      case 14:
+        return 100000; // ㅊ (최, 천, 채 등)
+      case 15:
+      case 16:
+        return 110000; // ㅋ, ㅌ (탁, 태 등)
+      case 17:
+        return 120000; // ㅍ (표, 피 등)
+      case 18:
+        return 130000; // ㅎ (홍, 한, 황, 허 등)
+      default:
+        return 900000;
+    }
+  }
+  return 900000;
+}
+
+export async function generateCustomerCode(db: any, name: string = ""): Promise<string> {
+  const base = getChosungBaseNumber(name);
+  const minCode = base + 1;
+  const maxCode = base + 9999;
+
+  const result = await db.execute({
+    sql: "SELECT customer_code FROM customers WHERE CAST(customer_code AS INTEGER) >= ? AND CAST(customer_code AS INTEGER) <= ? ORDER BY CAST(customer_code AS INTEGER) DESC LIMIT 1",
+    args: [minCode, maxCode],
+  });
+
+  if (result.rows.length > 0 && result.rows[0].customer_code) {
+    const lastNum = parseInt(String(result.rows[0].customer_code), 10);
+    if (!isNaN(lastNum)) {
+      return String(lastNum + 1);
+    }
+  }
+
+  return String(minCode);
+}
+
+export interface CustomerAddress {
+  id: number;
+  customer_id: number;
+  alias: string;
+  recipient_name: string;
+  recipient_phone: string;
+  zipcode?: string;
+  address: string;
+  address_detail?: string;
+  delivery_memo?: string;
+  is_default: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function fetchCustomerAddressesService(customerId: number): Promise<CustomerAddress[]> {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const res = await db.execute({
+    sql: "SELECT * FROM customer_addresses WHERE customer_id = ? ORDER BY is_default DESC, id ASC",
+    args: [customerId],
+  });
+  return res.rows.map((r: any) => ({
+    id: Number(r.id),
+    customer_id: Number(r.customer_id),
+    alias: String(r.alias || "기본 자택"),
+    recipient_name: String(r.recipient_name || ""),
+    recipient_phone: String(r.recipient_phone || ""),
+    zipcode: String(r.zipcode || ""),
+    address: String(r.address || ""),
+    address_detail: String(r.address_detail || ""),
+    delivery_memo: String(r.delivery_memo || ""),
+    is_default: Number(r.is_default || 0),
+    created_at: String(r.created_at || ""),
+    updated_at: String(r.updated_at || ""),
+  }));
+}
+
+export async function addCustomerAddressService(data: {
+  customer_id: number;
+  alias: string;
+  recipient_name: string;
+  recipient_phone: string;
+  zipcode?: string;
+  address: string;
+  address_detail?: string;
+  delivery_memo?: string;
+  is_default?: boolean;
+}) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const now = new Date().toISOString();
+
+  if (data.is_default) {
+    await db.execute({
+      sql: "UPDATE customer_addresses SET is_default = 0, updated_at = ? WHERE customer_id = ?",
+      args: [now, data.customer_id],
+    });
+  }
+
+  const res = await db.execute({
+    sql: `INSERT INTO customer_addresses (customer_id, alias, recipient_name, recipient_phone, zipcode, address, address_detail, delivery_memo, is_default, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      data.customer_id,
+      data.alias.trim() || "배송지",
+      data.recipient_name.trim(),
+      data.recipient_phone.trim(),
+      data.zipcode?.trim() || "",
+      data.address.trim(),
+      data.address_detail?.trim() || "",
+      data.delivery_memo?.trim() || "",
+      data.is_default ? 1 : 0,
+      now,
+      now,
+    ],
+  });
+  return Number(res.lastInsertRowid);
+}
+
+export async function updateCustomerAddressService(data: {
+  id: number;
+  customer_id: number;
+  alias?: string;
+  recipient_name?: string;
+  recipient_phone?: string;
+  zipcode?: string;
+  address?: string;
+  address_detail?: string;
+  delivery_memo?: string;
+  is_default?: boolean;
+}) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const now = new Date().toISOString();
+
+  if (data.is_default) {
+    await db.execute({
+      sql: "UPDATE customer_addresses SET is_default = 0, updated_at = ? WHERE customer_id = ?",
+      args: [now, data.customer_id],
+    });
+  }
+
+  await db.execute({
+    sql: `UPDATE customer_addresses SET 
+            alias = COALESCE(?, alias),
+            recipient_name = COALESCE(?, recipient_name),
+            recipient_phone = COALESCE(?, recipient_phone),
+            zipcode = COALESCE(?, zipcode),
+            address = COALESCE(?, address),
+            address_detail = COALESCE(?, address_detail),
+            delivery_memo = COALESCE(?, delivery_memo),
+            is_default = COALESCE(?, is_default),
+            updated_at = ?
+          WHERE id = ?`,
+    args: [
+      data.alias !== undefined ? data.alias.trim() : null,
+      data.recipient_name !== undefined ? data.recipient_name.trim() : null,
+      data.recipient_phone !== undefined ? data.recipient_phone.trim() : null,
+      data.zipcode !== undefined ? data.zipcode.trim() : null,
+      data.address !== undefined ? data.address.trim() : null,
+      data.address_detail !== undefined ? data.address_detail.trim() : null,
+      data.delivery_memo !== undefined ? data.delivery_memo.trim() : null,
+      data.is_default !== undefined ? (data.is_default ? 1 : 0) : null,
+      now,
+      data.id,
+    ],
+  });
+  return true;
+}
+
+export async function deleteCustomerAddressService(id: number) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  await db.execute({ sql: "DELETE FROM customer_addresses WHERE id = ?", args: [id] });
+  return true;
+}
+
 export async function fetchSettingsService() {
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");
@@ -12,7 +229,7 @@ export async function fetchSettingsService() {
   }
 
   const productsResult = await db.execute(
-    "SELECT id, name, weight_kg, price FROM products WHERE active = 1 ORDER BY weight_kg ASC"
+    "SELECT id, code, name, category, weight_kg, price, unit, active FROM products ORDER BY active DESC, id ASC"
   );
 
   return {
@@ -21,16 +238,125 @@ export async function fetchSettingsService() {
   };
 }
 
-export async function fetchProductsService(): Promise<{ id: number; name: string; weight_kg: number; price: number }[]> {
+export async function fetchProductsService(): Promise<ProductItem[]> {
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");
-  const res = await db.execute("SELECT id, name, weight_kg, price FROM products WHERE active = 1 ORDER BY weight_kg ASC");
+  const res = await db.execute("SELECT id, code, name, category, weight_kg, price, unit, active FROM products WHERE active = 1 ORDER BY id ASC");
   return res.rows.map((r) => ({
     id: Number(r.id),
+    code: String(r.code || `P-${r.id}`),
     name: String(r.name),
-    weight_kg: Number(r.weight_kg),
-    price: Number(r.price),
+    category: String(r.category || "절임배추류"),
+    weight_kg: Number(r.weight_kg || 0),
+    price: Number(r.price || 0),
+    unit: String(r.unit || "박스"),
+    active: Number(r.active ?? 1),
   }));
+}
+
+export async function fetchAllProductsService(): Promise<ProductItem[]> {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const res = await db.execute("SELECT id, code, name, category, weight_kg, price, unit, active FROM products ORDER BY active DESC, id ASC");
+  return res.rows.map((r) => ({
+    id: Number(r.id),
+    code: String(r.code || `P-${r.id}`),
+    name: String(r.name),
+    category: String(r.category || "절임배추류"),
+    weight_kg: Number(r.weight_kg || 0),
+    price: Number(r.price || 0),
+    unit: String(r.unit || "박스"),
+    active: Number(r.active ?? 1),
+  }));
+}
+
+export async function createProductService(data: {
+  code: string;
+  name: string;
+  category?: string;
+  weight_kg?: number;
+  price: number;
+  unit?: string;
+}) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const now = new Date().toISOString();
+  const res = await db.execute({
+    sql: `INSERT INTO products (code, name, category, weight_kg, price, unit, active, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    args: [
+      data.code.trim().toUpperCase(),
+      data.name.trim(),
+      data.category?.trim() || "일반농산물",
+      Number(data.weight_kg || 0),
+      Number(data.price),
+      data.unit?.trim() || "박스",
+      now,
+      now,
+    ],
+  });
+  return Number(res.lastInsertRowid);
+}
+
+export async function updateProductService(data: {
+  id: number;
+  code?: string;
+  name?: string;
+  category?: string;
+  weight_kg?: number;
+  price?: number;
+  unit?: string;
+  active?: number;
+}) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const now = new Date().toISOString();
+  await db.execute({
+    sql: `UPDATE products SET 
+            code = COALESCE(?, code),
+            name = COALESCE(?, name),
+            category = COALESCE(?, category),
+            weight_kg = COALESCE(?, weight_kg),
+            price = COALESCE(?, price),
+            unit = COALESCE(?, unit),
+            active = COALESCE(?, active),
+            updated_at = ?
+          WHERE id = ?`,
+    args: [
+      data.code !== undefined ? data.code.trim().toUpperCase() : null,
+      data.name !== undefined ? data.name.trim() : null,
+      data.category !== undefined ? data.category.trim() : null,
+      data.weight_kg !== undefined ? Number(data.weight_kg) : null,
+      data.price !== undefined ? Number(data.price) : null,
+      data.unit !== undefined ? data.unit.trim() : null,
+      data.active !== undefined ? Number(data.active) : null,
+      now,
+      data.id,
+    ],
+  });
+  return true;
+}
+
+export async function deleteProductService(id: number) {
+  const db = getClientDb();
+  if (!db) throw new Error("DB_NOT_CONFIGURED");
+  const check = await db.execute({
+    sql: "SELECT COUNT(*) as cnt FROM order_items WHERE product_id = ?",
+    args: [id],
+  });
+  if (Number(check.rows[0]?.cnt) > 0) {
+    await db.execute({
+      sql: "UPDATE products SET active = 0, updated_at = ? WHERE id = ?",
+      args: [new Date().toISOString(), id],
+    });
+    return { deactivated: true };
+  } else {
+    await db.execute({
+      sql: "DELETE FROM products WHERE id = ?",
+      args: [id],
+    });
+    return { deactivated: false };
+  }
 }
 
 export async function saveSettingsService(
@@ -71,6 +397,8 @@ export async function fetchDashboardService(dateStr: string) {
       SELECT 
         o.id,
         o.order_no,
+        o.customer_id,
+        c.customer_code,
         o.customer_name,
         o.customer_phone,
         o.shipping_address,
@@ -86,6 +414,7 @@ export async function fetchDashboardService(dateStr: string) {
         s.tracking_no,
         s.status as shipment_status
       FROM orders o
+      LEFT JOIN customers c ON c.id = o.customer_id
       LEFT JOIN shipments s ON s.order_id = o.id
       WHERE o.shipping_date = ?
       ORDER BY o.id DESC
@@ -213,12 +542,20 @@ export async function createOrderService(data: {
         args: [data.name, data.address || "", data.address_detail || "", now, customerId],
       });
     } else {
+      const custCode = await generateCustomerCode(db, data.name);
       const newCustomer = await db.execute({
-        sql: `INSERT INTO customers (name, phone, zipcode, address, address_detail, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        args: [data.name, data.phone || "", data.zipcode || "", data.address || "", data.address_detail || "", now, now],
+        sql: `INSERT INTO customers (customer_code, name, phone, zipcode, address, address_detail, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [custCode, data.name, data.phone || "", data.zipcode || "", data.address || "", data.address_detail || "", now, now],
       });
       customerId = Number(newCustomer.lastInsertRowid);
+      if (data.address) {
+        await db.execute({
+          sql: `INSERT INTO customer_addresses (customer_id, alias, recipient_name, recipient_phone, zipcode, address, address_detail, is_default, created_at, updated_at)
+                VALUES (?, '기본 자택', ?, ?, ?, ?, ?, 1, ?, ?)`,
+          args: [customerId, data.name, data.phone || "", data.zipcode || "", data.address, data.address_detail || "", now, now],
+        });
+      }
     }
   } else {
     // 행사/축제 납품 등 전화번호가 없는 경우 이름으로 고객 확인 또는 신규 등록
@@ -235,12 +572,20 @@ export async function createOrderService(data: {
         });
       }
     } else {
+      const custCode = await generateCustomerCode(db, data.name);
       const newCustomer = await db.execute({
-        sql: `INSERT INTO customers (name, phone, zipcode, address, address_detail, created_at, updated_at)
-              VALUES (?, '', '', ?, '', ?, ?)`,
-        args: [data.name, data.address || "", now, now],
+        sql: `INSERT INTO customers (customer_code, name, phone, zipcode, address, address_detail, created_at, updated_at)
+              VALUES (?, ?, '', '', ?, '', ?, ?)`,
+        args: [custCode, data.name, data.address || "", now, now],
       });
       customerId = Number(newCustomer.lastInsertRowid);
+      if (data.address) {
+        await db.execute({
+          sql: `INSERT INTO customer_addresses (customer_id, alias, recipient_name, recipient_phone, address, is_default, created_at, updated_at)
+                VALUES (?, '기본 자택', ?, '', ?, 1, ?, ?)`,
+          args: [customerId, data.name, data.address, now, now],
+        });
+      }
     }
   }
 
@@ -341,6 +686,7 @@ export async function fetchOrdersService(dateStr: string) {
         o.id,
         o.order_no,
         o.customer_id,
+        c.customer_code,
         o.customer_name,
         o.customer_phone,
         o.shipping_address,
@@ -358,6 +704,7 @@ export async function fetchOrdersService(dateStr: string) {
         s.tracking_no,
         s.status as shipment_status
       FROM orders o
+      LEFT JOIN customers c ON c.id = o.customer_id
       LEFT JOIN shipments s ON s.order_id = o.id
       WHERE o.shipping_date = ?
       ORDER BY o.id DESC
@@ -652,21 +999,35 @@ export async function fetchCustomersService(query: string = "") {
 
   let sql = `
     SELECT 
-      c.id, c.name, c.phone, c.zipcode, c.address, c.address_detail, c.memo,
-      COUNT(o.id) as order_count,
-      MAX(o.shipping_date) as last_order_date
+      c.id, c.customer_code, c.name, c.phone, c.zipcode, c.address, c.address_detail, c.memo,
+      COUNT(DISTINCT o.id) as order_count,
+      COALESCE(SUM(o.total_amount), 0) as total_spent,
+      MAX(o.shipping_date) as last_order_date,
+      MIN(o.shipping_date) as first_order_date,
+      COUNT(DISTINCT ca.id) as address_count
     FROM customers c
     LEFT JOIN orders o ON o.customer_id = c.id
+    LEFT JOIN customer_addresses ca ON ca.customer_id = c.id
   `;
   const args: any[] = [];
 
   if (query && query.trim()) {
     const cleanQ = query.trim().replace(/-/g, "");
-    sql += " WHERE c.name LIKE ? OR REPLACE(c.phone, '-', '') LIKE ?";
-    args.push(`%${query.trim()}%`, `%${cleanQ}%`);
+    sql += ` WHERE (
+      c.name LIKE ? 
+      OR REPLACE(c.phone, '-', '') LIKE ? 
+      OR c.customer_code LIKE ?
+      OR c.id IN (
+        SELECT customer_id FROM customer_addresses 
+        WHERE REPLACE(recipient_phone, '-', '') LIKE ? 
+           OR recipient_name LIKE ? 
+           OR address LIKE ?
+      )
+    )`;
+    args.push(`%${query.trim()}%`, `%${cleanQ}%`, `%${query.trim()}%`, `%${cleanQ}%`, `%${query.trim()}%`, `%${query.trim()}%`);
   }
 
-  sql += " GROUP BY c.id ORDER BY c.id DESC LIMIT 50";
+  sql += " GROUP BY c.id ORDER BY CAST(COALESCE(c.customer_code, '999999') AS INTEGER) ASC, c.id DESC LIMIT 100";
 
   const result = await db.execute({ sql, args });
   return result.rows;
@@ -685,7 +1046,8 @@ export async function fetchCustomerDetailService(id: number) {
 
   const ordersResult = await db.execute({
     sql: `
-      SELECT o.id, o.order_no, o.order_date, o.shipping_date, o.total_amount, o.payment_status, o.order_status
+      SELECT o.id, o.order_no, o.order_date, o.shipping_date, o.total_amount, o.payment_status, o.order_status,
+             (SELECT GROUP_CONCAT(oi.product_name||' '||oi.quantity||'개', ', ') FROM order_items oi WHERE oi.order_id = o.id) as items_summary
       FROM orders o
       WHERE o.customer_id = ?
       ORDER BY o.id DESC
@@ -693,9 +1055,12 @@ export async function fetchCustomerDetailService(id: number) {
     args: [id],
   });
 
+  const addresses = await fetchCustomerAddressesService(id);
+
   return {
     customer: customerResult.rows[0],
     orders: ordersResult.rows,
+    addresses,
   };
 }
 
@@ -871,10 +1236,12 @@ export async function createCustomerService(data: {
     });
     return { id, isNew: false };
   } else {
+    const custCode = await generateCustomerCode(db, data.name);
     const res = await db.execute({
-      sql: `INSERT INTO customers (name, phone, phone2, address, address_detail, memo, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO customers (customer_code, name, phone, phone2, address, address_detail, memo, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
+        custCode,
         data.name,
         data.phone,
         data.phone2 || "",
@@ -885,7 +1252,15 @@ export async function createCustomerService(data: {
         now,
       ],
     });
-    return { id: Number(res.lastInsertRowid), isNew: true };
+    const newId = Number(res.lastInsertRowid);
+    if (data.address) {
+      await db.execute({
+        sql: `INSERT INTO customer_addresses (customer_id, alias, recipient_name, recipient_phone, address, address_detail, is_default, created_at, updated_at)
+              VALUES (?, '기본 자택', ?, ?, ?, ?, 1, ?, ?)`,
+        args: [newId, data.name, data.phone, data.address, data.address_detail || "", now, now],
+      });
+    }
+    return { id: newId, isNew: true, customer_code: custCode };
   }
 }
 
@@ -947,8 +1322,8 @@ export async function fetchAllOrdersService(opts: {
     const q = search.trim();
     const cleanQ = q.replace(/-/g, "");
     if (searchType === "CUSTOMER") {
-      wheres.push("(c.name LIKE ? OR o.customer_name LIKE ?)");
-      args.push(`%${q}%`, `%${q}%`);
+      wheres.push("(c.name LIKE ? OR o.customer_name LIKE ? OR c.customer_code LIKE ?)");
+      args.push(`%${q}%`, `%${q}%`, `%${q}%`);
     } else if (searchType === "PHONE") {
       wheres.push("(REPLACE(c.phone,'-','') LIKE ? OR REPLACE(o.customer_phone,'-','') LIKE ?)");
       args.push(`%${cleanQ}%`, `%${cleanQ}%`);
@@ -957,9 +1332,9 @@ export async function fetchAllOrdersService(opts: {
       args.push(`%${q}%`, `%${q}%`, `%${q}%`);
     } else {
       wheres.push(
-        "(c.name LIKE ? OR o.customer_name LIKE ? OR REPLACE(c.phone,'-','') LIKE ? OR REPLACE(o.customer_phone,'-','') LIKE ? OR c.address LIKE ? OR o.shipping_address LIKE ?)"
+        "(c.name LIKE ? OR o.customer_name LIKE ? OR c.customer_code LIKE ? OR REPLACE(c.phone,'-','') LIKE ? OR REPLACE(o.customer_phone,'-','') LIKE ? OR c.address LIKE ? OR o.shipping_address LIKE ?)"
       );
-      args.push(`%${q}%`, `%${q}%`, `%${cleanQ}%`, `%${cleanQ}%`, `%${q}%`, `%${q}%`);
+      args.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${cleanQ}%`, `%${cleanQ}%`, `%${q}%`, `%${q}%`);
     }
   }
   if (dateFrom) { wheres.push("o.shipping_date >= ?"); args.push(dateFrom); }
@@ -975,7 +1350,7 @@ export async function fetchAllOrdersService(opts: {
     SELECT
       o.id, o.order_no, o.shipping_date, o.payment_status, o.order_status,
       o.total_amount, s.tracking_no, o.memo, o.order_type, o.event_name,
-      c.id as customer_id, c.name as customer_name, c.phone as customer_phone,
+      c.id as customer_id, c.customer_code, c.name as customer_name, c.phone as customer_phone,
       c.address as shipping_address, c.address_detail as shipping_address_detail,
       (SELECT GROUP_CONCAT(p.name||' '||oi.quantity||'박스', ', ')
        FROM order_items oi JOIN products p ON p.id = oi.product_id
@@ -1019,6 +1394,7 @@ export async function fetchAllOrdersService(opts: {
 // 고객 수정
 export async function updateCustomerService(data: {
   id: number;
+  customer_code?: string;
   name: string;
   phone: string;
   address?: string;
@@ -1028,8 +1404,18 @@ export async function updateCustomerService(data: {
   const db = getClientDb();
   if (!db) throw new Error("DB_NOT_CONFIGURED");
   await db.execute({
-    sql: `UPDATE customers SET name=?, phone=?, address=?, address_detail=?, memo=? WHERE id=?`,
-    args: [data.name, data.phone, data.address || "", data.address_detail || "", data.memo || "", data.id],
+    sql: `UPDATE customers SET 
+            customer_code = COALESCE(?, customer_code),
+            name=?, phone=?, address=?, address_detail=?, memo=? WHERE id=?`,
+    args: [
+      data.customer_code ? data.customer_code.trim().toUpperCase() : null,
+      data.name,
+      data.phone,
+      data.address || "",
+      data.address_detail || "",
+      data.memo || "",
+      data.id,
+    ],
   });
 }
 

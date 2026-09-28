@@ -294,15 +294,15 @@ export function DashboardView({
           </div>
 
           {(summary.eventQty20kg ?? 0) > 0 && (
-            <div className="bg-purple-50 border-2 border-purple-400 rounded-xl p-3 sm:p-3.5 shadow-2xs text-purple-900">
-              <div className="text-xs sm:text-sm font-black flex items-center justify-center gap-1 mb-0.5 text-purple-900 truncate">
-                <span>🎪</span>
+            <div className="bg-slate-100 border border-slate-300 rounded-xl p-3 sm:p-3.5 shadow-2xs text-slate-900">
+              <div className="text-xs sm:text-sm font-bold flex items-center justify-center gap-1 mb-0.5 text-slate-800 truncate">
+                <span>[행사]</span>
                 <span>{summary.eventNames?.join(", ") || "임실 김치 축제"}</span>
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-purple-800 stat-number">
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 stat-number">
                 {summary.eventQty20kg} <span className="text-base sm:text-lg font-bold">박스</span>
               </div>
-              <div className="text-xs font-bold text-purple-700 mt-0.5">
+              <div className="text-xs font-medium text-slate-600 mt-0.5">
                 행사 {summary.eventOrdersCount}건 납품
               </div>
             </div>
@@ -332,7 +332,7 @@ export function DashboardView({
 
         <div className="pt-1 flex flex-wrap justify-between items-center gap-2">
           <div className="text-xs sm:text-sm font-medium text-slate-600">
-            💡 내일 도착할 배추는 오늘 우체국택배로 발송해야 합니다.
+            [안내] 내일 도착할 배추는 오늘 우체국택배로 발송해야 합니다.
           </div>
           <button
             onClick={onGoToShipments}
@@ -410,17 +410,17 @@ export function DashboardView({
                   </div>
 
                   {count > 0 ? (
-                    <div className="space-y-0.5 text-xs font-black">
+                    <div className="space-y-0.5 text-xs font-bold">
                       {(sched.eventQty20kg ?? 0) > 0 ? (
                         <>
-                          <div className="text-emerald-950 font-black">일반 {sched.normalQty20kg ?? 0}박스</div>
-                          <div className="text-purple-800 font-black bg-purple-100 px-1 py-0.2 rounded-xs flex items-center justify-center gap-0.5" title={`${sched.eventNames?.join(", ") || "임실 김치 축제"} 납품`}>
-                            <span className="text-[10px]">🎪</span>
-                            <span>축제 {sched.eventQty20kg}박스</span>
+                          <div className="text-emerald-950 font-bold">일반 {sched.normalQty20kg ?? 0}박스</div>
+                          <div className="text-slate-800 font-bold bg-slate-200 px-1 py-0.2 rounded-xs flex items-center justify-center gap-0.5" title={`${sched.eventNames?.join(", ") || "임실 김치 축제"} 납품`}>
+                            <span>[행사]</span>
+                            <span>{sched.eventQty20kg}박스</span>
                           </div>
                         </>
                       ) : (
-                        <div className="text-emerald-950 font-black">20kg {sched.qty20kg}박스</div>
+                        <div className="text-emerald-950 font-bold">20kg {sched.qty20kg}박스</div>
                       )}
                     </div>
                   ) : (
@@ -548,13 +548,13 @@ export function DashboardView({
               <button
                 type="button"
                 onClick={() => setOrderFilter("EVENT")}
-                className={`px-3 py-1 rounded-lg text-xs md:text-sm font-black transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-3 py-1 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer flex items-center gap-1 ${
                   orderFilter === "EVENT"
-                    ? "bg-purple-700 text-white shadow-xs"
-                    : "bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-300"
                 }`}
               >
-                <span>🎪 행사 납품 ({summary.eventOrdersCount})</span>
+                <span>[행사] 행사 납품 ({summary.eventOrdersCount})</span>
               </button>
             </div>
           )}
@@ -579,23 +579,23 @@ export function DashboardView({
               <div
                 key={ord.id}
                 className={`py-3 border-b border-slate-200 last:border-0 rounded-xl px-2 transition-colors ${
-                  isEvent ? "bg-purple-50/40 border-purple-200" : ""
+                  isEvent ? "bg-slate-50 border-slate-300" : ""
                 }`}
               >
                 {/* 고객 정보 행 */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {isEvent && (
-                    <span className="shrink-0 px-2 py-0.5 text-xs font-black bg-purple-100 text-purple-900 border border-purple-300 rounded-md inline-flex items-center gap-1">
-                      <span>🎪</span>
+                    <span className="shrink-0 px-2 py-0.5 text-xs font-bold bg-slate-200 text-slate-800 border border-slate-300 rounded-md inline-flex items-center gap-1">
+                      <span>[행사]</span>
                       <span>{ord.event_name || "임실 김치 축제"}</span>
                     </span>
                   )}
-                  <span className="text-lg font-extrabold text-slate-900">{ord.customer_name}</span>
+                  <span className="text-base font-bold text-slate-900">{ord.customer_name}</span>
                   <PhoneCallLink
                     phone={ord.customer_phone}
                     name={ord.customer_name}
                     showIcon
-                    className="text-sm text-emerald-800 font-bold hover:underline"
+                    className="text-xs text-emerald-800 font-bold hover:underline"
                   />
                   {ord.memo && (
                     <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-1.5 py-0.5 border border-rose-200">
@@ -605,7 +605,7 @@ export function DashboardView({
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
                   {isEvent
-                    ? (ord.shipping_address ? `납품위치: ${ord.shipping_address}` : "🎪 행사 현장 직접 납품 (택배 없음)")
+                    ? (ord.shipping_address ? `납품위치: ${ord.shipping_address}` : "[행사] 현장 직접 납품 (택배 없음)")
                     : `${ord.shipping_address || "주소 미입력"} ${ord.shipping_address_detail || ""}`.trim()}
                 </div>
                 {/* 상태 + 버튼 행 - 한 줄 유지 */}

@@ -78,7 +78,7 @@ export function PhoneCallLink({
       return;
     }
     // 짧게 클릭/탭했을 때 바로 전화 걸리지 않고 안내
-    showToast("전화 연결은 번호를 길게 꾹 눌러주세요 📞");
+    showToast("전화 연결은 번호를 길게 꾹 눌러주세요.");
   };
 
   const handleCall = () => {

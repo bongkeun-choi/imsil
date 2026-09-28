@@ -246,7 +246,7 @@ export function OrderShareModal({
             }`}
           >
             <ImageIcon className="w-4 h-4 text-emerald-600" />
-            <span>🖼️ 장모님 주문 카드</span>
+            <span>주문 확인 카드</span>
           </button>
 
           <button
@@ -259,7 +259,7 @@ export function OrderShareModal({
             }`}
           >
             <FileText className="w-4 h-4 text-emerald-600" />
-            <span>💬 문자 / 카톡 문구</span>
+            <span>문자 / 카톡 문구</span>
           </button>
         </div>
 
@@ -370,7 +370,7 @@ export function OrderShareModal({
               className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-2xl font-black text-lg flex items-center justify-center gap-2.5 shadow-md cursor-pointer transition-all"
             >
               <Smartphone className="w-6 h-6" />
-              <span>📱 스마트폰 공유 (카카오톡·문자 선택)</span>
+              <span>스마트폰 공유 (카카오톡·문자 선택)</span>
             </button>
 
             {/* 2. 전용 바로가기 버튼 2단 그리드 (카카오톡 / 문자) */}

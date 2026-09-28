@@ -6,6 +6,7 @@ import {
   Image as ImageIcon,
   FileText,
   CheckCircle2,
+  Check,
   AlertTriangle,
   RefreshCw,
   Plus,
@@ -399,8 +400,8 @@ export function SmartOrderImportView({
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs md:text-sm font-semibold text-slate-600 max-w-lg mx-auto pt-2">
-            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">① 이미지 전처리 ✓</div>
-            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">② 텍스트 추출 ✓</div>
+            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center justify-center gap-1">① 이미지 전처리 <Check className="w-3.5 h-3.5 text-emerald-600 inline" /></div>
+            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center justify-center gap-1">② 텍스트 추출 <Check className="w-3.5 h-3.5 text-emerald-600 inline" /></div>
             <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">③ 주문정보 분석 ...</div>
             <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">④ 고객·중복 검사 ...</div>
           </div>
