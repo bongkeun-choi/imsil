@@ -127,22 +127,32 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
     fetchCustomers("");
   }, []);
 
-  // 모바일 뒤로가기 버튼 처리
+  // 모바일 뒤로가기 버튼 처리 (계층형 모달 지원)
   useEffect(() => {
-    const handlePopState = () => {
-      if (showDetailModal || importContactsModal || manualAddModal || unsupportedModal || showAddressModal || editCustomerModal) {
-        setShowDetailModal(false);
-        setImportContactsModal(false);
-        setManualAddModal(false);
-        setUnsupportedModal(false);
+    const handlePopState = (e: PopStateEvent) => {
+      const modalState = e.state?.modal;
+
+      // 1) 자식 모달(배송지 또는 고객정보 수정)에서 뒤로가기 된 경우: 부모 모달(상세)은 유지하고 자식만 닫음
+      if (modalState === "customer-detail") {
         setShowAddressModal(false);
         setEditCustomerModal(false);
-        setIsInlineEditing(false);
+        setShowDetailModal(true);
+        return;
       }
+
+      // 2) 상세 모달 또는 1단계 모달에서 뒤로가기 된 경우: 전체 닫기
+      setShowAddressModal(false);
+      setEditCustomerModal(false);
+      setShowDetailModal(false);
+      setImportContactsModal(false);
+      setManualAddModal(false);
+      setUnsupportedModal(false);
+      setIsInlineEditing(false);
     };
+
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [showDetailModal, importContactsModal, manualAddModal, unsupportedModal, showAddressModal, editCustomerModal]);
+  }, []);
 
   const openModalSafely = (type: "detail" | "import" | "manual" | "unsupported" | "address" | "edit-customer") => {
     window.history.pushState({ modal: `customer-${type}` }, "");
@@ -154,6 +164,34 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
     if (type === "edit-customer") setEditCustomerModal(true);
   };
 
+  // 배송지 추가/수정 모달만 닫기 (부모인 고객 상세 모달은 안전하게 유지)
+  const closeAddressModal = () => {
+    setShowAddressModal(false);
+    if (window.history.state?.modal === "customer-address") {
+      window.history.back();
+    }
+  };
+
+  // 고객 정보 수정 모달만 닫기 (부모인 고객 상세 모달은 안전하게 유지)
+  const closeEditCustomerModal = () => {
+    setEditCustomerModal(false);
+    if (window.history.state?.modal === "customer-edit-customer") {
+      window.history.back();
+    }
+  };
+
+  // 고객 상세 팝업 닫기 (고객 목록 화면으로 복귀)
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setShowAddressModal(false);
+    setEditCustomerModal(false);
+    setIsInlineEditing(false);
+    if (window.history.state?.modal === "customer-detail") {
+      window.history.back();
+    }
+  };
+
+  // 1단계 일반 모달 닫기
   const closeModalSafely = () => {
     if (window.location.hash || window.history.state?.modal) {
       window.history.back();
@@ -382,7 +420,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
       });
 
       alert("고객 정보가 성공적으로 수정되었습니다.");
-      closeModalSafely();
+      closeEditCustomerModal();
       await loadCustomerDetail(selectedCustomerId);
       await fetchCustomers(query);
     } catch (err: any) {
@@ -465,7 +503,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
       }
 
       setEditingAddressId(null);
-      closeModalSafely();
+      closeAddressModal();
       await loadCustomerDetail(selectedCustomerId);
       await fetchCustomers(query);
     } catch (err: any) {
@@ -752,7 +790,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                   <button
                     type="button"
                     onClick={() => {
-                      closeModalSafely();
+                      closeDetailModal();
                       onSelectAddressForOrder(customerDetail.customer);
                     }}
                     className="inline-flex items-center gap-1 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg cursor-pointer whitespace-nowrap shadow-xs"
@@ -772,7 +810,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                 </button>
                 <button
                   type="button"
-                  onClick={closeModalSafely}
+                  onClick={closeDetailModal}
                   className="text-slate-400 hover:text-white p-1 rounded cursor-pointer"
                   title="닫기"
                 >
@@ -793,7 +831,10 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                     {onSelectAddressForOrder && (
                       <button
                         type="button"
-                        onClick={() => onSelectAddressForOrder(customerDetail.customer)}
+                        onClick={() => {
+                          closeDetailModal();
+                          onSelectAddressForOrder(customerDetail.customer);
+                        }}
                         className="inline-flex items-center gap-1 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 px-2.5 py-1 rounded-lg cursor-pointer whitespace-nowrap shadow-xs"
                       >
                         <ShoppingBag className="w-3.5 h-3.5" />
@@ -915,7 +956,10 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
                             {onSelectAddressForOrder && (
                               <button
                                 type="button"
-                                onClick={() => onSelectAddressForOrder(customerDetail.customer, addr)}
+                                onClick={() => {
+                                  closeDetailModal();
+                                  onSelectAddressForOrder(customerDetail.customer, addr);
+                                }}
                                 className="text-emerald-800 hover:text-emerald-950 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
                                 title="이 배송지로 바로 주문 등록하기"
                               >
@@ -1260,7 +1304,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
               </h3>
               <button
                 type="button"
-                onClick={closeModalSafely}
+                onClick={closeAddressModal}
                 className="text-white hover:bg-slate-800 p-1 rounded cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1374,7 +1418,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
               <div className="pt-2 flex gap-2">
                 <button
                   type="button"
-                  onClick={closeModalSafely}
+                  onClick={closeAddressModal}
                   className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold cursor-pointer"
                 >
                   취소
@@ -1402,7 +1446,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
               </h3>
               <button
                 type="button"
-                onClick={closeModalSafely}
+                onClick={closeEditCustomerModal}
                 className="text-white hover:bg-slate-800 p-1 rounded cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1508,7 +1552,7 @@ export function CustomerView({ onRequestConfig, onSelectAddressForOrder }: Custo
               <div className="pt-2 flex gap-2">
                 <button
                   type="button"
-                  onClick={closeModalSafely}
+                  onClick={closeEditCustomerModal}
                   className="flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold cursor-pointer"
                 >
                   취소
