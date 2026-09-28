@@ -23,6 +23,7 @@ import {
   Users,
   Trash2,
   Split,
+  X,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import {
@@ -320,29 +321,67 @@ export function NewOrderView({
     const p = result.parsed;
     const cm = result.customer_match;
 
+    // 1. 주문자 정보 설정
     if (cm?.name || p.customer_name) {
       setName(cm?.name || p.customer_name || "");
     }
     if (cm?.phone || p.customer_phone) {
       setPhone(cm?.phone || p.customer_phone || "");
     }
-    if (p.shipping_address || cm?.address) {
-      setAddress(p.shipping_address || cm?.address || "");
-    }
-    if (cm?.address_detail) {
-      setAddressDetail(cm.address_detail);
-    }
-    if (p.shipping_date) {
-      setShippingDate(p.shipping_date);
-    }
 
-    // 수량 매핑 (현재 판매 규격인 20kg로 우선 매핑)
-    let totalBoxes = 0;
-    for (const item of p.items) {
-      totalBoxes += item.quantity;
+    // 2. 다중 배송지 모드 감지 시 (1인 다처 분할 발송)
+    if (p.is_multi_dest && p.destinations && p.destinations.length > 0) {
+      setIsMultiDest(true);
+      setDifferentRecipient(false);
+      setDestinations(
+        p.destinations.map((d, idx) => ({
+          alias: d.alias || `배송지 ${idx + 1}`,
+          recipient_name: d.recipient_name,
+          recipient_phone: d.recipient_phone,
+          recipient_phone2: d.recipient_phone2 || "",
+          address: d.address,
+          address_detail: d.address_detail || "",
+          shipping_date: d.shipping_date || shippingDate,
+          quantity: d.quantity || 1,
+          memo: d.memo || "",
+          save_as_address: true,
+        }))
+      );
+    } else {
+      // 3. 단일 배송 모드
+      setIsMultiDest(false);
+
+      // 주문자와 받는 분이 다른 경우 (선물/가족 발송)
+      if (p.is_different_recipient && p.recipient_name) {
+        setDifferentRecipient(true);
+        setRecipientName(p.recipient_name);
+        setRecipientPhone(p.recipient_phone || p.customer_phone || "");
+        setRecipientPhone2(p.recipient_phone2 || "");
+      } else {
+        setDifferentRecipient(false);
+        setRecipientName(cm?.name || p.customer_name || "");
+        setRecipientPhone(cm?.phone || p.customer_phone || "");
+        setRecipientPhone2("");
+      }
+
+      if (p.shipping_address || cm?.address) {
+        setAddress(p.shipping_address || cm?.address || "");
+      }
+      if (p.shipping_address_detail || cm?.address_detail) {
+        setAddressDetail(p.shipping_address_detail || cm?.address_detail || "");
+      }
+      if (p.shipping_date) {
+        setShippingDate(p.shipping_date);
+      }
+
+      // 수량 매핑 (현재 판매 규격인 20kg로 우선 매핑)
+      let totalBoxes = 0;
+      for (const item of p.items) {
+        totalBoxes += item.quantity;
+      }
+      if (totalBoxes === 0) totalBoxes = 1;
+      setQty20kg(totalBoxes);
     }
-    if (totalBoxes === 0) totalBoxes = 1;
-    setQty20kg(totalBoxes);
 
     if (p.raw_text) {
       setMemo(p.raw_text);
@@ -659,17 +698,17 @@ export function NewOrderView({
             </div>
           </div>
 
-          <div className="flex gap-1.5 shrink-0">
+          <div className="flex gap-1.5 flex-wrap shrink-0">
             <button
               type="button"
               onClick={() => {
-                const sample1 = "전주시 완산구 고사동 303 - 3으로 배추 10키로 2박스 보내주세요 얼마인가요? 010-6615-776 최봉근입니";
+                const sample1 = "전주시 완산구 고사동 303 - 3으로 배추 20키로 2박스 보내주세요 얼마인가요? 010-6615-776 최봉근입니";
                 setSmsText(sample1);
                 handleAnalyzeSms(sample1);
               }}
               className="text-xs px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-md font-bold cursor-pointer border border-emerald-200 whitespace-nowrap"
             >
-              예시 1 테스트
+              예시 1 (단일)
             </button>
             <button
               type="button"
@@ -678,9 +717,31 @@ export function NewOrderView({
                 setSmsText(sample2);
                 handleAnalyzeSms(sample2);
               }}
-              className="text-xs px-2 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-md font-bold cursor-pointer border border-amber-200 whitespace-nowrap"
+              className="text-xs px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-md font-bold cursor-pointer border border-slate-300 whitespace-nowrap"
             >
               예시 2 (작년처럼)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const sample3 = "주문자: 최봉근 010-6615-776, 받는사람: 딸 김영희 010-9876-5432, 서울 송파구 올림픽로 300 101동 202호 절임배추 20kg 1박스 11월 15일 도착부탁합니다";
+                setSmsText(sample3);
+                handleAnalyzeSms(sample3);
+              }}
+              className="text-xs px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-md font-bold cursor-pointer border border-emerald-300 whitespace-nowrap"
+            >
+              예시 3 (수령인 분리)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const sample4 = `최봉근 010-6615-776 배추 20키로 총 3박스 주문합니다 입금완료\n1. 서울 딸네 서울 강남구 테헤란로 152 1박스 받는사람 홍수진 010-1111-2222 11월 15일\n2. 부산 아들네 부산 해운대구 센텀중앙로 78 2박스 받는사람 홍철수 010-3333-4444 11월 18일`;
+                setSmsText(sample4);
+                handleAnalyzeSms(sample4);
+              }}
+              className="text-xs px-2 py-0.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md font-bold cursor-pointer border border-slate-900 whitespace-nowrap"
+            >
+              예시 4 (다중 배송 2곳)
             </button>
           </div>
         </div>
@@ -733,7 +794,7 @@ export function NewOrderView({
             rows={2}
             value={smsText}
             onChange={(e) => setSmsText(e.target.value)}
-            placeholder="문자 내용을 여기에 길게 눌러 [붙여넣기] 하세요...&#10;예: 전주시 완산구 고사동 303-3 배추 10키로 2박스 010-6615-776 최봉근"
+            placeholder="문자 내용을 여기에 길게 눌러 [붙여넣기] 하세요...&#10;• 일반: 전주시 완산구 고사동 303-3 배추 20키로 2박스 010-6615-776 최봉근&#10;• 선물: 주문자 최봉근 010-6615-776 / 받는사람 딸 김영희 010-9876-5432 서울 송파구...&#10;• 여러곳: 1. 서울 딸네 1박스 / 2. 부산 아들네 2박스"
             className="w-full px-3 py-1.5 border-2 border-slate-300 rounded-xl text-sm md:text-base text-slate-900 focus:border-emerald-600 focus:outline-hidden bg-slate-50"
           />
 
@@ -760,10 +821,30 @@ export function NewOrderView({
         {/* 분석 완료 시 알림 & 안내 배너 */}
         {autoFilledNotice && analysisResult && (
           <div className="space-y-1.5 pt-1">
-            {/* 1. 자동 채움 완료 성공 알림 */}
-            <div className="p-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl text-emerald-950 flex items-center gap-1.5 text-xs md:text-sm font-bold">
-              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
-              <span>문자 내용을 분석하여 아래 주문서에 자동 입력했습니다. 확인 후 등록하세요!</span>
+            {/* 1. 자동 채움 완료 성공 알림 (모드별 안내) */}
+            <div className="p-2 bg-emerald-50 border-2 border-emerald-400 rounded-xl text-emerald-950 flex items-center justify-between gap-1.5 text-xs md:text-sm font-bold">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                {analysisResult.parsed.is_multi_dest ? (
+                  <span>
+                    [다중 배송 감지] 총 <strong>{destinations.length}곳</strong>의 배송지로 나누어 자동 입력되었습니다!
+                  </span>
+                ) : differentRecipient ? (
+                  <span>
+                    [수령인 분리 감지] 주문 고객({name})과 받는 분({recipientName})이 구분되어 자동 입력되었습니다!
+                  </span>
+                ) : (
+                  <span>문자 내용을 분석하여 아래 주문서에 자동 입력했습니다. 확인 후 등록하세요!</span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoFilledNotice(false)}
+                className="text-slate-400 hover:text-slate-700 p-0.5"
+                title="닫기"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
 
             {/* 2. 중복 검사 결과 알림 */}
